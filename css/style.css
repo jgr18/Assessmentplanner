@@ -122,6 +122,10 @@ table.dsm td.gekozen { outline: 3px solid var(--keuze); outline-offset: -3px; }
 table.dsm td.kenm { position: relative; }
 table.dsm td.kenm::after { content: ""; position: absolute; right: 2px; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 0 0 1px #1F2328; }
 table.dsm th.gekozen-kop { background: #FFE9A8 !important; }
+table.dsm td.hl, table.dsm th.hl { box-shadow: inset 0 0 0 999px rgba(55, 138, 221, 0.16); }
+table.dsm th.hl-kop { background: #CFE2F7 !important; color: #0C447C; font-weight: 700; }
+table.dsm td.hl-cel { outline: 3px solid #185FA5; outline-offset: -3px; }
+@media print { table.dsm .hl, table.dsm .hl-kop { box-shadow: none; } }
 
 /* Relatiepaneel */
 .soorten { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }

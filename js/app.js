@@ -271,7 +271,7 @@
         if (!k) { h += '<td' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + '></td>'; return; }
         const cls = gewichtKlasse(k.gewicht, r.drempel), lt = letter(k, r.drempel);
         const zwakAlleenLocatie = cls === 'w0' && k.gedeeld.every(g => g.soort === 'locatie');
-        h += '<td class="' + cls + '"' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + ' title="' + esc(k.gedeeld.map(g => resNaam(g) + ' ' + R.fmtGraad(g.graad)).join(', ')) + '">' + (cls === 'w0' ? (zwakAlleenLocatie ? '' : '·') : (lt.length > 1 ? '<span class="dubbel">' + lt + '</span>' : lt)) + '</td>';
+        h += '<td class="' + cls + '" data-k="1"' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + ' title="' + esc(k.gedeeld.map(g => resNaam(g) + ' ' + R.fmtGraad(g.graad)).join(', ')) + '">' + (cls === 'w0' ? (zwakAlleenLocatie ? '' : '·') : (lt.length > 1 ? '<span class="dubbel">' + lt + '</span>' : lt)) + '</td>';
       });
       h += '</tr>';
     });
@@ -288,6 +288,29 @@
       '<div id="mpaneel" class="koppelbalk"></div>' +
       '<div class="matrixkader" id="pm">' + matrixHtml(r, true) + '</div></section>';
     renderMatrixPaneel(r);
+    matrixOplichten($('#pm table.dsm'));
+  }
+  /* Oplichten bij aanwijzen: kop → die rij of kolom; cel met afhankelijkheid → beide rijen; lege cel → kruis. */
+  function matrixOplichten(tabel) {
+    if (!tabel) return;
+    let actief = [], vorige = null;
+    const wis = () => { actief.forEach(e => e.classList.remove('hl', 'hl-kop', 'hl-cel')); actief = []; };
+    const zet = (e, c) => { if (e) { e.classList.add(c); actief.push(e); } };
+    const rijen = tabel.tBodies[0].rows, kop = tabel.tHead.rows[0];
+    const rijAan = i => { const tr = rijen[i]; if (!tr) return; for (const c of tr.cells) zet(c, 'hl'); zet(tr.cells[1], 'hl-kop'); zet(kop.cells[i + 2], 'hl-kop'); };
+    const kolAan = j => { for (const tr of rijen) zet(tr.cells[j + 2], 'hl'); zet(kop.cells[j + 2], 'hl-kop'); zet(rijen[j] && rijen[j].cells[1], 'hl-kop'); };
+    tabel.addEventListener('mouseover', ev => {
+      const cel = ev.target.closest('td, th');
+      if (!cel || cel === vorige || !tabel.contains(cel)) return;
+      vorige = cel; wis();
+      const tr = cel.parentElement;
+      if (tr.parentElement.tagName === 'THEAD') { const j = cel.cellIndex - 2; if (j >= 0) kolAan(j); return; }
+      const i = tr.sectionRowIndex, j = cel.cellIndex - 2;
+      if (cel.tagName === 'TH') { rijAan(i); return; }
+      if (cel.dataset.k) { rijAan(i); rijAan(j); zet(cel, 'hl-cel'); zet(rijen[j].cells[i + 2], 'hl-cel'); return; }
+      rijAan(i); kolAan(j);
+    });
+    tabel.addEventListener('mouseleave', () => { vorige = null; wis(); });
   }
   function renderMatrixPaneel(r) {
     const p = $('#mpaneel'); if (!p) return;
