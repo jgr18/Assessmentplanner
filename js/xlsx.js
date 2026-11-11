@@ -56,7 +56,7 @@
 
   function bladXml(blad, stijl) {
     let x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
-    if (blad.liggend) x += '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
+    if (blad.liggend || blad.tabKleur) x += '<sheetPr>' + (blad.tabKleur ? '<tabColor rgb="FF' + blad.tabKleur + '"/>' : '') + (blad.liggend ? '<pageSetUpPr fitToPage="1"/>' : '') + '</sheetPr>';
     if (blad.bevries) {
       const { x: bx = 0, y: by = 0 } = blad.bevries;
       x += '<sheetViews><sheetView workbookViewId="0"><pane' + (bx ? ' xSplit="' + bx + '"' : '') + (by ? ' ySplit="' + by + '"' : '') + ' topLeftCell="' + kolom(bx) + (by + 1) + '" activePane="' + (bx && by ? 'bottomRight' : by ? 'bottomLeft' : 'topRight') + '" state="frozen"/></sheetView></sheetViews>';

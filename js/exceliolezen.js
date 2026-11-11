@@ -104,7 +104,8 @@
           const l = locKol >= 0 ? tekst(r[locKol]) : '';
           const gevonden = l ? m.locaties.find(x => x.naam.toLowerCase() === l.toLowerCase()) : null;
           if (l && !gevonden) fout('Tabblad Klassen, cel ' + celRef(i, locKol), 'Onbekende locatie "' + l + '" bij klas ' + naam + '.', 'Gebruik een locatie van het tabblad Locaties: ' + m.locaties.map(x => x.naam).join(', ') + '.');
-          res.locatie = gevonden ? gevonden.naam : '';
+          res.locatie = gevonden ? gevonden.naam : AP.model.locatieUitNaam(m, naam);
+          if (!res.locatie) let_op('Tabblad Klassen, rij ' + (i + 1), 'Voor klas ' + naam + ' is geen locatie te bepalen: de eerste letter past niet bij ' + m.locaties.map(x => x.naam).join(', ') + '.', 'Begin de klasnaam met de eerste letter van de locatie (bijv. E voor Enschede), of kies de locatie later op het tabblad Locaties.');
         }
         lijst.push(res);
       });
@@ -136,7 +137,7 @@
           if (!nr) { fout(bron + ', cel ' + celRef(i, kId), 'ID "' + id + '" heeft niet de vorm S001; er is een nieuwe ID gegeven.', 'Laat de ID leeg of gebruik S gevolgd door een nummer.'); id = ''; }
           else { id = AP.model.maakId(parseInt(nr[1], 10)); if (m.assessments.some(a => a.id === id)) { fout(bron, 'ID ' + id + ' komt dubbel voor; er is een nieuwe ID gegeven.', 'Geef elk assessment een eigen ID, of laat de ID leeg.'); id = ''; } else m.volgendeNummer = Math.max(m.volgendeNummer, parseInt(nr[1], 10) + 1); }
         }
-        const zoek = (soort, naam) => { const l = soort === 'docent' ? m.docenten : m.klassen; let x = l.find(y => y.naam.toLowerCase() === naam.toLowerCase()); if (!x) { x = { naam, beschikbaar: alleTv() }; if (soort === 'klas') x.locatie = m.locaties.length === 1 ? m.locaties[0].naam : ''; l.push(x); } return x.naam; };
+        const zoek = (soort, naam) => { const l = soort === 'docent' ? m.docenten : m.klassen; let x = l.find(y => y.naam.toLowerCase() === naam.toLowerCase()); if (!x) { x = { naam, beschikbaar: alleTv() }; if (soort === 'klas') x.locatie = AP.model.locatieUitNaam(m, naam); l.push(x); } return x.naam; };
         const a = { id, module, klas: zoek('klas', klas), docenten: docenten.map(d => zoek('docent', d)), uren, gepland: [] };
         m.assessments.push(a); if (!id) zonderId.push(a);
       });

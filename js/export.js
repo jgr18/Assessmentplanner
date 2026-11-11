@@ -44,8 +44,8 @@
       r.fouten.forEach(f => v.push([{ v: 'Fout', stijl: { kleur: '9B2C1C', vet: true } }, f.bron, '', '', f.melding + ' Herstel: ' + f.herstel]));
       r.waarschuwingen.forEach(f => v.push([{ v: 'Let op', stijl: { kleur: '854F0B', vet: true } }, f.bron, '', '', f.melding + ' ' + f.herstel]));
     }
-    v.push([], ['Leeswijzer: krapte = uren ÷ uren waarin klas, alle docenten en een lokaal op de locatie tegelijk vrij zijn. Prioriteit = hoogste van krapte en bezetting van de betrokken docenten, klas en locatie.'],
-      ['Plan per eiland van boven naar beneden; "volgt uit" noemt het eerder geplaatste assessment en de gedeelde docent, klas of locatie waardoor dit assessment erna komt. "Los / vulling" kan in de overgebleven ruimte.']);
+    v.push([], ['Leeswijzer: krapte = uren ÷ uren waarin klas en alle docenten tegelijk vrij zijn. Prioriteit = hoogste van krapte en bezetting van de betrokken docenten en klas. Lokalen tellen niet mee (bij te vragen); zie het tabblad Lokalen per dagdeel.'],
+      ['Plan per eiland van boven naar beneden; "volgt uit" noemt het eerder geplaatste assessment en de gedeelde docent of klas waardoor dit assessment erna komt. "Los / vulling" kan in de overgebleven ruimte.']);
 
     /* 2. Afhankelijkheden (matrix) */
     const ord = r.volgorde;
@@ -66,8 +66,8 @@
       a.push(rij); vorig = x.eiland;
     });
     a.push([], [{ v: 'Legenda', stijl: { vet: true } }],
-      [{ v: 'D', stijl: { vulling: 'FAC775', kleur: '412402', vet: true, midden: true, rand: true } }, 'Koppeling via gedeelde docent (K = klas, L = lokalen van de locatie; combinaties mogelijk, bijv. DK)'],
-      [{ v: '', stijl: { vulling: 'EF9F27', rand: true } }, 'Gedeelde docent/klas/locatie ≥ 50% bezet'],
+      [{ v: 'D', stijl: { vulling: 'FAC775', kleur: '412402', vet: true, midden: true, rand: true } }, 'Koppeling via gedeelde docent (K = klas, DK = beide). Lokalen tellen niet mee: die zijn bij te vragen.'],
+      [{ v: '', stijl: { vulling: 'EF9F27', rand: true } }, 'Gedeelde docent/klas ≥ 50% bezet'],
       [{ v: '', stijl: { vulling: 'FAC775', rand: true } }, '30–50% bezet'],
       [{ v: '', stijl: { vulling: 'FAEEDA', rand: true } }, 'Boven de drempel (' + Math.round(r.drempel * 100) + '%) tot 30%'],
       [{ v: '·', stijl: { kleur: '888780', midden: true, rand: true } }, 'Zwakke koppeling (onder de drempel): telt niet mee voor eilanden'],
@@ -82,17 +82,23 @@
       .sort((x, y) => (y[2].gewicht - x[2].gewicht) || (pos[x[0]] - pos[y[0]]))
       .forEach(([p, q, kk]) => kk.gedeeld.forEach((g, gi) => k.push([{ v: p, stijl: { rand: true, vet: gi === 0 } }, { v: q, stijl: { rand: true, vet: gi === 0 } }, { v: g.soort === 'locatie' ? 'lokalen' : g.soort, stijl: { rand: true } }, { v: g.naam, stijl: { rand: true } }, pct(g.graad), { v: kk.gewicht > r.drempel ? 'ja' : 'nee', stijl: { rand: true } }])));
 
-    /* 4. Bezetting */
-    const b = [[{ v: 'Bezetting docenten, klassen en locaties', stijl: { vet: true } }], [bron], ['Nodig = uren van nog niet geplande assessments; vrij = beschikbare uren min wat al gepland is. Bij een locatie in lokaaluren (lokalen × lesuren).'], []];
-    b.push(['Soort', 'Naam', 'Assessments (open)', 'Nodig (uur)', 'Vrij (uur)', 'Bezetting', 'Balk', 'Beschikbaar totaal (uur)'].map(x => ({ v: x, stijl: KOP })));
+    /* 4. Bezetting: bij invoer (alsof er niets gepland is) en na planning */
     const bezVul = g => g === Infinity || g > 1 ? 'F7C1C1' : g >= 0.5 ? 'EF9F27' : g >= 0.3 ? 'FAC775' : g > 0 ? 'FAEEDA' : null;
     const balk = g => g === Infinity ? '' : '█'.repeat(Math.max(g > 0 ? 1 : 0, Math.min(20, Math.round(g * 20))));
-    r.bezetting.forEach(x => b.push([{ v: x.soort === 'docent' ? 'Docent' : x.soort === 'klas' ? 'Klas/groep' : 'Locatie', stijl: { rand: true } }, { v: x.naam, stijl: { rand: true, vet: true } }, { v: x.aantal, stijl: { rand: true } }, { v: x.nodig, stijl: { rand: true } }, { v: x.beschikbaar, stijl: { rand: true } }, pct(x.graad, bezVul(x.graad) ? { vulling: bezVul(x.graad) } : {}), { v: balk(x.graad), stijl: { rand: true, kleur: x.graad > 1 ? 'A32D2D' : 'BA7517' } }, { v: x.totaalBeschikbaar, stijl: { rand: true } }]));
-    b.push([], ['Kleur: ≥ 100% rood (meer nodig dan vrij), 50–100% donkeroranje, 30–50% oranje, onder 30% lichtoranje. Balk: 20 blokjes = 100%.']);
+    const bezettingsblad = (res, titel, uitleg, kopNodig) => {
+      const b = [[{ v: titel, stijl: { vet: true } }], [bron], [uitleg], []];
+      b.push(['Soort', 'Naam', kopNodig, 'Nodig (uur)', 'Vrij (uur)', 'Bezetting', 'Balk', 'Beschikbaar totaal (uur)'].map(x => ({ v: x, stijl: KOP })));
+      res.bezetting.forEach(x => b.push([{ v: x.soort === 'docent' ? 'Docent' : x.soort === 'klas' ? 'Klas/groep' : 'Locatie (lokalen)', stijl: { rand: true } }, { v: x.naam, stijl: { rand: true, vet: true } }, { v: x.aantal, stijl: { rand: true } }, { v: x.nodig, stijl: { rand: true } }, { v: x.beschikbaar, stijl: { rand: true } }, pct(x.graad, bezVul(x.graad) ? { vulling: bezVul(x.graad) } : {}), { v: balk(x.graad), stijl: { rand: true, kleur: x.graad > 1 ? 'A32D2D' : 'BA7517' } }, { v: x.totaalBeschikbaar, stijl: { rand: true } }]));
+      b.push([], ['Kleur: ≥ 100% rood (meer nodig dan vrij), 50–100% donkeroranje, 30–50% oranje, onder 30% lichtoranje. Balk: 20 blokjes = 100%. Bij een locatie gaat het om lokaaluren (lokalen × lesuren).']);
+      return b;
+    };
+    const r0 = AP.rekenen.analyseerZonderPlanning(m);
+    const bInvoer = bezettingsblad(r0, 'Bezetting bij invoer', 'Zoals de invoer is, alsof er nog niets gepland is: nodig = uren van alle assessments, vrij = alle beschikbare uren.', 'Assessments');
+    const bNa = bezettingsblad(r, 'Bezetting na planning', r.gepland.length ? 'Na de ' + r.gepland.length + ' al ingeplande assessment(s): nodig = uren van wat nog gepland moet worden, vrij = beschikbare uren min wat al gepland is.' : 'Er is nog niets ingepland; deze bezetting is gelijk aan die bij invoer.', 'Assessments (nog te plannen)');
 
     /* 5 en 6. Beschikbaarheid docenten en klassen: de basis van de volgorde */
     const beschikbaarheidsblad = soort => {
-      const lijst = soort === 'docent' ? m.docenten : m.klassen, titel = 'Beschikbaarheid ' + (soort === 'docent' ? 'docenten' : 'klassen/groepen');
+      const lijst = soort === 'docent' ? m.docenten.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })) : m.klassen.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })), titel = 'Beschikbaarheid ' + (soort === 'docent' ? 'docenten' : 'klassen/groepen');
       const bezet = {};
       m.assessments.filter(x => x.gepland && x.gepland.length).forEach(x => (soort === 'docent' ? x.docenten : [x.klas]).forEach(n => x.gepland.forEach(sg => { const c = ((bezet[n] = bezet[n] || {})[sg.tv] = bezet[n][sg.tv] || { uren: 0, ids: [] }); c.uren += sg.uren; c.ids.push(x.id); })));
       const vrij = {}; r.bezetting.filter(x => x.soort === soort).forEach(x => { vrij[x.naam] = x; });
@@ -139,7 +145,8 @@
       { naam: 'Planningsvolgorde', rijen: v, kolommen: [7, 8, 24, 13, 12, 26, 7, 12, 9, 10, 26, 13, 26, 24], bevries: { y: 4 }, liggend: true },
       { naam: 'Afhankelijkheden', rijen: a, kolommen: [8, 8, 42].concat(ord.map(() => 6)), bevries: { x: 3, y: 4 }, liggend: true },
       { naam: 'Koppelingen', rijen: k, kolommen: [12, 12, 9, 18, 14, 14], bevries: { y: 4 } },
-      { naam: 'Bezetting', rijen: b, kolommen: [11, 20, 12, 12, 12, 12, 24, 16], bevries: { y: 5 } },
+      { naam: 'Bezetting bij invoer', rijen: bInvoer, kolommen: [16, 20, 26, 12, 12, 12, 24, 16], bevries: { y: 5 } },
+      { naam: 'Bezetting na planning', rijen: bNa, kolommen: [16, 20, 26, 12, 12, 12, 24, 16], bevries: { y: 5 } },
       { naam: 'Lokalen per dagdeel', rijen: ld, kolommen: [14, 12].concat(m.tijdvakken.map(() => 8), [12]), bevries: { x: 2, y: 5 }, liggend: true },
       { naam: 'Lokaalindeling', rijen: li, kolommen: [14, 10, 8, 70, 14, 10], bevries: { y: 5 } },
       beschikbaarheidsblad('docent'),

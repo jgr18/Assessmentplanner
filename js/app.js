@@ -160,7 +160,7 @@
 
   /* ================= BESCHIKBAARHEID ================= */
   function renderBeschikbaarheid() {
-    const soort = ui.soort, lijst = soort === 'docent' ? m.docenten : m.klassen;
+    const soort = ui.soort, lijst = soort === 'docent' ? m.docenten.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })) : m.klassen.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })); /* docenten en klassen op naam */
     const r = analyse(), bezet = bezetUren(soort);
     const graad = {}; r.bezetting.filter(b => b.soort === soort).forEach(b => { graad[b.naam] = b; });
     let vorigeDag = null;
@@ -227,7 +227,7 @@
     r.volgorde.forEach(it => { eilandTeller[it.eiland] = (eilandTeller[it.eiland] || 0) + 1; });
     r.volgorde.forEach(it => {
       if (it.eiland !== vorig) {
-        h += '<tr class="eilandkop' + (vorig !== null ? ' eilandgrens' : '') + '"><td colspan="12">' + (it.eiland === 'los' ? 'Los / vulling — geen sterke koppelingen; plan in de overgebleven ruimte' : 'Planningseiland ' + it.eiland + ' — ' + eilandTeller[it.eiland] + ' assessments die via drukke docenten, klassen of locaties samenhangen') + '</td></tr>';
+        h += '<tr class="eilandkop' + (vorig !== null ? ' eilandgrens' : '') + '"><td colspan="12">' + (it.eiland === 'los' ? 'Los / vulling — geen sterke koppelingen; plan in de overgebleven ruimte' : 'Planningseiland ' + it.eiland + ' — ' + eilandTeller[it.eiland] + ' assessments die via drukke docenten of klassen samenhangen') + '</td></tr>';
         vorig = it.eiland;
       }
       h += '<tr><td class="num">' + it.volgnummer + '</td><td class="mono"><b>' + it.id + '</b></td><td>' + esc(it.module) + '</td><td>' + esc(it.klas) + '</td><td class="klein">' + esc(it.locatie || '—') + '</td><td>' + esc(it.docenten.join('; ')) + '</td>' +
@@ -246,7 +246,7 @@
       '<section class="kolom breed">' + meldingenPaneel(r) +
       '<div class="rij tussen"><div class="rij"><span class="maat">Nog te plannen <b>' + r.volgorde.length + '</b></span><span class="maat">Planningseilanden <b>' + r.eilanden + '</b></span><span class="maat">Los / vulling <b>' + r.los + '</b></span><span class="maat">Gepland <b>' + r.gepland.length + '</b></span></div>' +
       '<label class="rij klein">Drempel voor een sterke koppeling <input id="drempel" type="number" min="0" max="100" step="5" value="' + Math.round(m.instellingen.drempel * 100) + '" style="width:80px"> %</label></div>' +
-      '<div class="paneel"><h2>Planningsvolgorde</h2><p class="klein">Plan van boven naar beneden. Krapte/prioriteit: hoe hoger, hoe minder speelruimte. "Volgt uit" noemt het eerdere assessment en de gedeelde docent, klas of locatie waardoor dit assessment erna komt. ⚠ = past alleen als een docent die dag op twee locaties is. Na inplannen rekent de lijst opnieuw met de ruimte die overblijft.</p>' +
+      '<div class="paneel"><h2>Planningsvolgorde</h2><p class="klein">Plan van boven naar beneden. Krapte/prioriteit: hoe hoger, hoe minder speelruimte. "Volgt uit" noemt het eerdere assessment en de gedeelde docent of klas waardoor dit assessment erna komt. Lokalen tellen niet mee in de volgorde (die kun je bijvragen). ⚠ = past alleen als een docent die dag op twee locaties is. Na inplannen rekent de lijst opnieuw met de ruimte die overblijft.</p>' +
       '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th class="num">Samen vrij (u)</th><th>Prioriteit</th><th>Knelpunt</th><th>Volgt uit</th><th class="rechts"></th></tr></thead><tbody>' +
       (h || '<tr><td colspan="12" class="klein">Alles is ingepland.</td></tr>') + '</tbody></table></div></div>' +
       (r.gepland.length ? '<div class="paneel"><h2>Al gepland</h2><div class="tabelkader"><table class="lijst"><thead><tr><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th>Ingepast in</th><th class="rechts"></th></tr></thead><tbody>' + gepland + '</tbody></table></div></div>' : '') +
@@ -278,13 +278,13 @@
     return h + '</tbody></table>';
   }
   function legendaMatrix(r) {
-    return '<div class="legenda"><span><span class="chip" style="background:#EF9F27"></span>Gedeelde docent/klas ≥ 50% bezet</span><span><span class="chip" style="background:#FAC775"></span>30–50%</span><span><span class="chip" style="background:#FAEEDA"></span>' + Math.round(r.drempel * 100) + '–30%</span><span>· zwak (telt niet voor eilanden)</span><span>D = via docent · K = via klas · L = via lokalen van de locatie (combinaties mogelijk, bijv. DK)</span><span>Dikke lijn = grens planningseiland</span></div>';
+    return '<div class="legenda"><span><span class="chip" style="background:#EF9F27"></span>Gedeelde docent/klas ≥ 50% bezet</span><span><span class="chip" style="background:#FAC775"></span>30–50%</span><span><span class="chip" style="background:#FAEEDA"></span>' + Math.round(r.drempel * 100) + '–30%</span><span>· zwak (telt niet voor eilanden)</span><span>D = via docent · K = via klas · DK = beide</span><span>Dikke lijn = grens planningseiland</span></div>';
   }
   function renderMatrix() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe.</section>'; return; }
     const r = analyse();
     inhoud.innerHTML = '<section class="paneel" style="flex:1 1 100%"><h2>Afhankelijkheden tussen nog te plannen assessments</h2>' +
-      '<p class="klein">Rijen en kolommen staan in planningsvolgorde. Een gevulde cel betekent: deze twee assessments delen een docent (D), klas (K) of de lokalen van een locatie (L) en beperken dus elkaars ruimte. De kleur toont hoe druk wat ze delen is.</p>' + legendaMatrix(r) +
+      '<p class="klein">Rijen en kolommen staan in planningsvolgorde. Een gevulde cel betekent: deze twee assessments delen een docent (D) of klas (K) en beperken dus elkaars ruimte. De kleur toont hoe druk wat ze delen is. Lokalen tellen hier niet mee: die kun je bijvragen; zie het tabblad Lokalen.</p>' + legendaMatrix(r) +
       '<div id="mpaneel" class="koppelbalk"></div>' +
       '<div class="matrixkader" id="pm">' + matrixHtml(r, true) + '</div></section>';
     renderMatrixPaneel(r);
@@ -312,11 +312,12 @@
   const BEZETTING_UITLEG = 'Nodig = uren van nog niet geplande assessments. Vrij = beschikbare uren min wat al gepland is; bij een locatie in lokaaluren (lokalen × lesuren). Hoe hoger de bezetting, hoe eerder de assessments van deze docent, klas of locatie aan de beurt zijn.';
   function renderBezetting() {
     const r = analyse();
-    inhoud.innerHTML = '<section class="paneel breed"><h2>Bezetting docenten, klassen en locaties</h2><p class="klein">' + BEZETTING_UITLEG + '</p>' + bezettingTabel(r) + '</section>';
+    inhoud.innerHTML = '<section class="paneel breed"><h2>Bezetting na planning</h2><p class="klein">' + (r.gepland.length ? 'Na de ' + r.gepland.length + ' al ingeplande assessment(s). ' : '') + BEZETTING_UITLEG + '</p>' + bezettingTabel(r) + '</section>' +
+      (r.gepland.length ? '<section class="paneel breed"><h2>Bezetting bij invoer</h2><p class="klein">Zoals de invoer is, alsof er nog niets gepland is.</p>' + bezettingTabel(R.analyseerZonderPlanning(m)) + '</section>' : '');
   }
   /* Beschikbaarheid als vaste (niet-klikbare) tabel, voor afdruk en export-voorbeeld. */
   function beschikbaarheidTabel(soort, r) {
-    const lijst = soort === 'docent' ? m.docenten : m.klassen;
+    const lijst = soort === 'docent' ? m.docenten.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })) : m.klassen.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' }));
     if (!lijst.length) return '<p class="klein">Geen ' + (soort === 'docent' ? 'docenten' : 'klassen/groepen') + '.</p>';
     const bezet = bezetUren(soort);
     const vrij = {}; r.bezetting.filter(b => b.soort === soort).forEach(b => { vrij[b.naam] = b; });
@@ -354,7 +355,7 @@
     }).join('');
     const klasRijen = m.klassen.map(k => '<tr><td><b>' + esc(k.naam) + '</b></td><td><label class="verborgen" for="kloc-' + esc(k.naam) + '">Locatie ' + esc(k.naam) + '</label><select id="kloc-' + esc(k.naam) + '" data-klasloc="' + esc(k.naam) + '"><option value="">— kies —</option>' + m.locaties.map(l => '<option' + (k.locatie === l.naam ? ' selected' : '') + '>' + esc(l.naam) + '</option>').join('') + '</select></td><td class="klein">' + M.gebruikt(m, 'klas', k.naam).length + ' assessment(s)' + (k.locatie ? '' : ' · <span class="pastniet">nog geen locatie</span>') + '</td></tr>').join('');
     inhoud.innerHTML =
-      '<section class="kolom smal"><div class="paneel"><h2>Klassen en locaties plakken</h2><p class="uitleg">Eén regel per klas: <span class="mono" style="font-size:12px">klas ⇥ locatie</span>. Een klas zit vast aan één locatie; daar worden haar assessments afgenomen.</p>' +
+      '<section class="kolom smal"><div class="paneel"><h2>Klassen en locaties plakken</h2><p class="uitleg">De locatie van een klas volgt uit de eerste letter: <b>A</b> = Apeldoorn, <b>D</b> = Deventer, <b>E</b> = Enschede. Wijkt een klas af, dan kies je de locatie hieronder of plak je <span class="mono" style="font-size:12px">klas ⇥ locatie</span>.</p>' +
       '<label class="veld">Regels<textarea id="plak-kl" rows="6" class="mono" placeholder="1A&#9;Enschede&#10;2B&#9;Deventer"></textarea></label><div class="rij"><button class="knop primair" id="plak-kl-knop">Toevoegen of bijwerken</button></div>' +
       '<p class="klein">Een klas naar een andere locatie verplaatsen haalt de planning van haar assessments weg, omdat de lokalen dan niet meer kloppen.</p></div>' +
       '<div class="paneel"><h3>Locatie toevoegen</h3><div class="raster2"><label class="veld">Naam<input id="loc-naam" placeholder="bijv. Zwolle"></label><label class="veld">Lokalen per dagdeel<input id="loc-lok" type="number" min="0" value="1"></label></div><button class="knop" id="loc-voeg">Toevoegen</button></div></section>' +
@@ -427,9 +428,10 @@
       '<div class="rij"><button class="knop primair" id="exp-xlsx">Werkbestand opslaan (.xlsx)</button><button class="knop" id="exp-print">Afdrukken / PDF</button></div></div>' + (r.fouten.length ? meldingenPaneel(r) : '') + '</section>' +
       '<section class="paneel breed afdruk"><div><h2>Planningsvolgorde — ' + esc(m.naam) + '</h2><div class="bron">Invoerversie ' + m.invoerversie + ' · drempel eilanden ' + Math.round(r.drempel * 100) + '% · ' + datum + (r.gepland.length ? ' · ' + r.gepland.length + ' assessment(s) al gepland en niet in deze lijst' : '') + '</div></div>' +
       '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th class="num">Samen vrij</th><th>Prioriteit</th><th>Knelpunt</th><th>Eiland</th><th>Volgt uit</th><th>Gepland op</th></tr></thead><tbody>' + rijen + '</tbody></table></div>' +
-      '<div class="pagina-breuk"><h2>Afhankelijkheden</h2><div class="bron">Zelfde volgorde als hierboven. D = gedeelde docent, K = gedeelde klas, L = gedeelde lokalen van de locatie; kleur = bezetting van wat gedeeld wordt.</div></div>' + legendaMatrix(r) +
+      '<div class="pagina-breuk"><h2>Afhankelijkheden</h2><div class="bron">Zelfde volgorde als hierboven. D = gedeelde docent, K = gedeelde klas; kleur = bezetting van wat gedeeld wordt. Lokalen tellen niet mee.</div></div>' + legendaMatrix(r) +
       '<div class="matrixkader">' + matrixHtml(r, false) + '</div>' +
-      '<div class="pagina-breuk"><h2>Bezetting docenten, klassen en locaties</h2><div class="bron">' + BEZETTING_UITLEG + '</div></div>' + bezettingTabel(r) +
+      '<div class="pagina-breuk"><h2>Bezetting bij invoer</h2><div class="bron">Zoals de invoer is, alsof er nog niets gepland is.</div></div>' + bezettingTabel(R.analyseerZonderPlanning(m)) +
+      '<div class="pagina-breuk"><h2>Bezetting na planning</h2><div class="bron">' + (r.gepland.length ? 'Na de ' + r.gepland.length + ' al ingeplande assessment(s). ' : 'Er is nog niets ingepland; gelijk aan de bezetting bij invoer. ') + BEZETTING_UITLEG + '</div></div>' + bezettingTabel(r) +
       '<div class="pagina-breuk"><h2>Lokalen per dagdeel</h2><div class="bron">' + LOKAALDRUK_UITLEG + '</div></div>' + legendaLokaaldruk() + lokaaldrukTabel(r, false) + tekortenHtml(r) +
       (Object.keys(r.lokaalRooster).length ? '<div class="pagina-breuk"><h2>Lokaalindeling (ingepast)</h2><div class="bron">Per locatie en dagdeel welke assessments in welk lokaal zijn ingepast. Volgorde binnen een lokaal is niet vastgelegd.</div></div>' + lokaalRoosterHtml(r) : '') +
       '<div class="pagina-breuk"><h2>Beschikbaarheid docenten</h2><div class="bron">De beschikbaarheid waarop de volgorde is gebaseerd (invoerversie ' + m.invoerversie + ').</div></div>' + legendaBeschikbaarheid() + beschikbaarheidTabel('docent', r) +

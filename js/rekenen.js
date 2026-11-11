@@ -11,10 +11,12 @@
      (bijvoorbeeld 12 uur = ochtend + middag; 3 uur kan 2 uur ochtend + 1 uur middag zijn).
    - een docent hoort op één dag op één locatie te zijn; een plaatsing die dat breekt kan wel, met een waarschuwing.
 
-   Krapte    = benodigde uren ÷ uren waarin docent(en), klas én een lokaal tegelijk vrij zijn (zonder locatiewissel).
-   Bezetting = benodigde uren ÷ vrije uren, per docent, klas en locatie (lokaaluren).
-   Prioriteit= hoogste van krapte en de bezetting van de betrokken docenten, klas en locatie.
-   Koppeling = gedeelde docent (D), klas (K) of locatie (L); gewicht = hoogste bezetting van wat gedeeld wordt.
+   Lokalen zijn bij te vragen en tellen daarom niet mee in krapte, prioriteit en afhankelijkheden;
+   een tekort aan lokalen wordt apart gemeld (tabblad Lokalen) en bij het inpassen wordt wel een vrij lokaal gezocht.
+   Krapte    = benodigde uren ÷ uren waarin docent(en) en klas tegelijk vrij zijn (zonder locatiewissel).
+   Bezetting = benodigde uren ÷ vrije uren, per docent en klas; per locatie (lokaaluren) ter informatie.
+   Prioriteit= hoogste van krapte en de bezetting van de betrokken docenten en klas.
+   Koppeling = gedeelde docent (D) of klas (K); gewicht = hoogste bezetting van wat gedeeld wordt.
    Eilanden en volgorde: zie de toelichting bij "volgorde" hieronder. */
 (function (root) {
   'use strict';
@@ -121,7 +123,7 @@
       const betrokken = mijn.length || geplandeAss.some(a => soort === 'docent' ? a.docenten.includes(r.naam) : a.klas === r.naam);
       if (!r.beschikbaar.length && betrokken) fouten.push({ bron: 'Beschikbaarheid, ' + label, melding: 'Er is geen beschikbaarheid ingevuld.', herstel: 'Vul op het tabblad Beschikbaarheid in wanneer ' + label + ' beschikbaar is.' });
       else if (g > 1) waarschuwingen.push({ bron: 'Bezetting, ' + label, melding: 'Nodig ' + fmt(nodig) + ' uur, vrij ' + fmt(vrij) + ' uur' + (geplandeAss.length ? ' (na de al geplande assessments)' : '') + '.', herstel: 'Breid de beschikbaarheid uit, verdeel assessments over meer docenten, of plan een deel in een andere week.' });
-      if (soort === 'klas' && betrokken && !r.locatie) fouten.push({ bron: 'Locaties, klas ' + r.naam, melding: 'Deze klas heeft nog geen locatie.', herstel: 'Kies op het tabblad Locaties de locatie van ' + r.naam + '.' });
+      if (soort === 'klas' && betrokken && !r.locatie) fouten.push({ bron: 'Locaties, klas ' + r.naam, melding: 'Deze klas heeft nog geen locatie: de eerste letter past bij geen enkele locatie.', herstel: 'Kies op het tabblad Locaties de locatie van ' + r.naam + ', of laat de klasnaam beginnen met de eerste letter van de locatie (A, D of E).' });
     }));
     m.locaties.forEach(l => {
       const mijn = open.filter(a => locVan(a.klas) === l.naam);
@@ -142,10 +144,9 @@
         if (!wissel) { overlapMensen += mc; overlapRegel += loc ? Math.min(mc, maxLokaalRest(loc, t.id)) : 0; }
       });
       const opt = opties(a), zonderWissel = opt.filter(o => !o.waarschuwing);
-      const krapte = overlapRegel === 0 ? Infinity : a.uren / overlapRegel;
+      const krapte = overlapMensen === 0 ? Infinity : a.uren / overlapMensen;
       const res = [{ soort: 'klas', naam: a.klas, graad: graad.klas[a.klas] || 0 }]
-        .concat(a.docenten.map(d => ({ soort: 'docent', naam: d, graad: graad.docent[d] || 0 })))
-        .concat(loc ? [{ soort: 'locatie', naam: loc, graad: graad.locatie[loc] || 0 }] : []);
+        .concat(a.docenten.map(d => ({ soort: 'docent', naam: d, graad: graad.docent[d] || 0 })));
       let prio = krapte, knelpunt = 'gezamenlijke beschikbaarheid';
       res.forEach(r => { if (r.graad > prio) { prio = r.graad; knelpunt = (r.soort === 'docent' ? 'docent ' : r.soort === 'klas' ? 'klas ' : 'lokalen ') + r.naam; } });
       const bron = 'Assessment ' + a.id + ' (' + a.module + ', ' + a.klas + ')';
@@ -160,7 +161,7 @@
       } else if (opt.length && !zonderWissel.length) {
         waarschuwingen.push({ bron, melding: 'Past alleen als een docent die dag op twee locaties is.', herstel: 'Plan bij voorkeur eerst anders, of accepteer de locatiewissel bij het inplannen.' });
       }
-      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, opties: opt, res };
+      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, opties: opt, res };
     });
 
     /* --- koppelingen --- */
@@ -169,7 +170,6 @@
       const a = items[i], b = items[j], gedeeld = [];
       if (a.klas === b.klas) gedeeld.push({ soort: 'klas', naam: a.klas, graad: graad.klas[a.klas] || 0 });
       a.docenten.forEach(d => { if (b.docenten.includes(d)) gedeeld.push({ soort: 'docent', naam: d, graad: graad.docent[d] || 0 }); });
-      if (a.locatie && a.locatie === b.locatie) gedeeld.push({ soort: 'locatie', naam: a.locatie, graad: graad.locatie[a.locatie] || 0 });
       if (!gedeeld.length) continue;
       gedeeld.sort((p, q) => q.graad - p.graad);
       koppeling[sleutel(a.id, b.id)] = { gewicht: gedeeld[0].graad, via: gedeeld[0], gedeeld };
@@ -245,5 +245,12 @@
   function fmtGraad(g) { return g === Infinity ? 'geen ruimte' : (Math.round(g * 100) + '%'); }
   function fmtKrapte(k) { return k === Infinity ? '∞' : (Math.round(k * 100) / 100).toFixed(2).replace('.', ','); }
 
-  AP.rekenen = { analyseer, fmt, fmtGraad, fmtKrapte, dagVan };
+  /* Analyse alsof er nog niets gepland is (voor "bezetting bij invoer"). */
+  function analyseerZonderPlanning(m) {
+    const kopie = JSON.parse(JSON.stringify(m));
+    kopie.assessments.forEach(a => { a.gepland = []; });
+    return analyseer(kopie);
+  }
+
+  AP.rekenen = { analyseer, analyseerZonderPlanning, fmt, fmtGraad, fmtKrapte, dagVan };
 })(typeof window !== 'undefined' ? window : globalThis);

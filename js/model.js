@@ -37,9 +37,17 @@
   const vindAss = (m, id) => m.assessments.find(a => a.id === id) || null;
   const splitsDocenten = s => String(s || '').split(/[;,/+]| en /).map(x => x.trim()).filter(Boolean);
 
+  /* Locatie van een klas uit de eerste letter van de klasnaam: A = Apeldoorn, D = Deventer, E = Enschede.
+     Werkt voor elke locatie: de letter moet bij precies één locatienaam de eerste letter zijn. */
+  function locatieUitNaam(m, klasNaam) {
+    const l = String(klasNaam || '').trim().charAt(0).toLowerCase(); if (!l) return '';
+    const kandidaten = m.locaties.filter(x => x.naam.charAt(0).toLowerCase() === l);
+    if (kandidaten.length === 1) return kandidaten[0].naam;
+    return m.locaties.length === 1 ? m.locaties[0].naam : '';
+  }
   function zorgVoorRes(m, soort, naam) {
     let r = vindRes(m, soort, naam);
-    if (!r) { r = { naam: naam.trim(), beschikbaar: m.tijdvakken.map(t => t.id) }; if (soort === 'klas') r.locatie = m.locaties.length === 1 ? m.locaties[0].naam : ''; lijst(m, soort).push(r); return { r, nieuw: true }; } /* nieuw = standaard volledig beschikbaar */
+    if (!r) { r = { naam: naam.trim(), beschikbaar: m.tijdvakken.map(t => t.id) }; if (soort === 'klas') r.locatie = locatieUitNaam(m, naam); lijst(m, soort).push(r); return { r, nieuw: true }; } /* nieuw = standaard volledig beschikbaar */
     return { r, nieuw: false };
   }
 
@@ -300,7 +308,7 @@
     m.instellingen = Object.assign(leegModel().instellingen, d.instellingen || {});
     if (!Array.isArray(d.locaties)) m.locaties = standaardLocaties();
     m.locaties = m.locaties.map(l => Object.assign({ lokalen: 1, perTijdvak: {} }, l));
-    m.klassen = m.klassen.map(k => Object.assign({ locatie: '' }, k));
+    m.klassen = m.klassen.map(k => { k = Object.assign({ locatie: '' }, k); if (!k.locatie) k.locatie = locatieUitNaam(m, k.naam); return k; });
     const urenTv = {}; m.tijdvakken.forEach(t => { urenTv[t.id] = t.uren; });
     m.assessments = m.assessments.map(a => {
       a = Object.assign({ gepland: [] }, a);
@@ -326,6 +334,6 @@
     leegModel, maakId, vindRes, vindAss, plakAssessments, plakBeschikbaarheid, wisselBeschikbaar, zetRijBeschikbaar, zetAllesBeschikbaar, zetKolomBeschikbaar, voegResToe,
     wijzigAssessment, verwijderAssessment, gebruikt, verwijderRes, hernoemRes, plan, ontplan,
     voegTijdvakToe, wijzigTijdvak, standaardUren, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal,
-    vindLoc, lokalenIn, zetLokalen, wijzigLocatie, voegLocatieToe, verwijderLocatie, zetKlasLocatie, plakKlasLocaties
+    vindLoc, locatieUitNaam, lokalenIn, zetLokalen, wijzigLocatie, voegLocatieToe, verwijderLocatie, zetKlasLocatie, plakKlasLocaties
   };
 })(typeof window !== 'undefined' ? window : globalThis);

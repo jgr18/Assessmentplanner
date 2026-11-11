@@ -22,9 +22,10 @@
     const dagdelen = m.tijdvakken.map(t => ({ v: t.label, stijl: KOP_MIDDEN }));
     const laatsteKol = c => X.kolom(c + n - 1);
 
-    /* 1. Assessments */
-    const a = [['ID', 'Module', 'Klas/groep', 'Docent(en)', 'Uren'].map(v => ({ v, stijl: KOP }))];
-    m.assessments.forEach(x => a.push([{ v: o.metIds === false ? '' : x.id, stijl: { rand: true, kleur: '5F5E5A' } }, { v: x.module, stijl: { rand: true } }, { v: x.klas, stijl: { rand: true } }, { v: x.docenten.join('; '), stijl: { rand: true } }, { v: x.uren, stijl: { rand: true } }]));
+    /* 1. Assessments (sjabloon zonder ID; het werkbestand toont de ID's die de app heeft gegeven) */
+    const metIds = o.metIds !== false;
+    const a = [(metIds ? ['ID'] : []).concat(['Module', 'Klas/groep', 'Docent(en)', 'Uren']).map(v => ({ v, stijl: KOP }))];
+    m.assessments.forEach(x => a.push((metIds ? [{ v: x.id, stijl: { rand: true, kleur: '5F5E5A' } }] : []).concat([{ v: x.module, stijl: { rand: true } }, { v: x.klas, stijl: { rand: true } }, { v: x.docenten.join('; '), stijl: { rand: true } }, { v: x.uren, stijl: { rand: true } }])));
 
     /* 2. Locaties: lesuren per dagdeel + lokalen per locatie per dagdeel */
     const l = [[{ v: 'Locatie', stijl: KOP }].concat(dagdelen)];
@@ -35,34 +36,61 @@
     const rij = (res, extra) => extra.concat(m.tijdvakken.map(t => res.beschikbaar.includes(t.id) ? { v: '+', stijl: PLUS } : { v: '', stijl: LEEG }));
     const lege = (aantal, voor) => { const r = []; for (let i = 0; i < aantal; i++) r.push(voor.map(() => ({ v: '', stijl: { rand: true } })).concat(m.tijdvakken.map(() => ({ v: '', stijl: LEEG })))); return r; };
     const d = [[{ v: 'Docent', stijl: KOP }].concat(dagdelen)];
-    m.docenten.forEach(r => d.push(rij(r, [{ v: r.naam, stijl: { rand: true, vet: true } }])));
-    const k = [[{ v: 'Klas/groep', stijl: KOP }, { v: 'Locatie', stijl: KOP }].concat(dagdelen)];
-    m.klassen.forEach(r => k.push(rij(r, [{ v: r.naam, stijl: { rand: true, vet: true } }, { v: r.locatie || '', stijl: { rand: true } }])));
+    m.docenten.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })).forEach(r => d.push(rij(r, [{ v: r.naam, stijl: { rand: true, vet: true } }])));
+    /* Klassen: de locatie volgt uit de eerste letter van de klas (A/D/E); het werkbestand toont hem ter controle. */
+    const k = [[{ v: 'Klas/groep', stijl: KOP }].concat(metIds ? [{ v: 'Locatie', stijl: KOP }] : [], dagdelen)];
+    m.klassen.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl', { sensitivity: 'base' })).forEach(r => k.push(rij(r, [{ v: r.naam, stijl: { rand: true, vet: true } }].concat(metIds ? [{ v: r.locatie || '', stijl: { rand: true } }] : []))));
 
     const extraRijen = o.extraRijen === undefined ? 50 : o.extraRijen;
-    d.push(...lege(extraRijen, [0])); k.push(...lege(extraRijen, [0, 1]));
+    d.push(...lege(extraRijen, [0])); k.push(...lege(extraRijen, metIds ? [0, 1] : [0]));
     const locNamen = m.locaties.map(x => x.naam);
     return [
-      { naam: 'Assessments', rijen: a, kolommen: [9, 28, 14, 36, 8], bevries: { y: 1 } },
+      { naam: 'Assessments', rijen: a, kolommen: (metIds ? [9] : []).concat([28, 14, 36, 8]), bevries: { y: 1 } },
       { naam: 'Locaties', rijen: l, kolommen: [22].concat(m.tijdvakken.map(() => 8)), bevries: { x: 1, y: 2 }, liggend: true },
       { naam: 'Docenten', rijen: d, kolommen: [22].concat(m.tijdvakken.map(() => 8)), bevries: { x: 1, y: 1 }, liggend: true,
         keuzelijsten: [{ bereik: 'B2:' + laatsteKol(1) + d.length, lijst: ['+'] }], groen: [{ bereik: 'B2:' + laatsteKol(1) + d.length, waarden: ['+', 'x'] }] },
-      { naam: 'Klassen', rijen: k, kolommen: [16, 14].concat(m.tijdvakken.map(() => 8)), bevries: { x: 2, y: 1 }, liggend: true,
-        keuzelijsten: [{ bereik: 'B2:B' + k.length, lijst: locNamen }, { bereik: 'C2:' + laatsteKol(2) + k.length, lijst: ['+'] }], groen: [{ bereik: 'C2:' + laatsteKol(2) + k.length, waarden: ['+', 'x'] }] }
+      metIds
+        ? { naam: 'Klassen', rijen: k, kolommen: [16, 14].concat(m.tijdvakken.map(() => 8)), bevries: { x: 2, y: 1 }, liggend: true,
+            keuzelijsten: [{ bereik: 'B2:B' + k.length, lijst: locNamen }, { bereik: 'C2:' + laatsteKol(2) + k.length, lijst: ['+'] }], groen: [{ bereik: 'C2:' + laatsteKol(2) + k.length, waarden: ['+', 'x'] }] }
+        : { naam: 'Klassen', rijen: k, kolommen: [16].concat(m.tijdvakken.map(() => 8)), bevries: { x: 1, y: 1 }, liggend: true,
+            keuzelijsten: [{ bereik: 'B2:' + laatsteKol(1) + k.length, lijst: ['+'] }], groen: [{ bereik: 'B2:' + laatsteKol(1) + k.length, waarden: ['+', 'x'] }] }
     ];
+  }
+
+  /* Tabkleuren per soort tabblad */
+  const KLEUR = { toelichting: '888780', invoer: '378ADD', planning: '1D9E75', signalering: 'EF9F27' };
+  const GROEP = {
+    'Toelichting': 'toelichting', 'Instellingen': 'toelichting',
+    'Assessments': 'invoer', 'Locaties': 'invoer', 'Docenten': 'invoer', 'Klassen': 'invoer',
+    'Planning': 'planning', 'Planningsvolgorde': 'planning', 'Lokaalindeling': 'planning',
+    'Afhankelijkheden': 'signalering', 'Koppelingen': 'signalering', 'Bezetting bij invoer': 'signalering', 'Bezetting na planning': 'signalering',
+    'Lokalen per dagdeel': 'signalering', 'Beschikbaarheid docenten': 'signalering', 'Beschikbaarheid klassen': 'signalering'
+  };
+  const VOLGORDE = ['toelichting', 'invoer', 'planning', 'signalering'];
+  function kleurEnOrden(bladen) {
+    bladen.forEach(b => { const g = GROEP[b.naam] || 'signalering'; b.tabKleur = KLEUR[g]; b._groep = g; });
+    return bladen.map((b, i) => ({ b, i })).sort((x, y) => (VOLGORDE.indexOf(x.b._groep) - VOLGORDE.indexOf(y.b._groep)) || (x.i - y.i)).map(x => { delete x.b._groep; return x.b; });
   }
 
   function toelichtingBlad(werkbestand) {
     const r = [[{ v: werkbestand ? 'Werkbestand assessmentplanner' : 'Invoersjabloon assessmentplanner', stijl: { vet: true } }], []];
+    r.push([{ v: 'Kleuren van de tabbladen', stijl: { vet: true } }]);
+    r.push([{ v: 'grijs', stijl: { vulling: KLEUR.toelichting, kleur: 'FFFFFF', vet: true, midden: true } }, 'Toelichting en instellingen']);
+    r.push([{ v: 'blauw', stijl: { vulling: KLEUR.invoer, kleur: 'FFFFFF', vet: true, midden: true } }, 'Invoer: Assessments, Locaties, Docenten, Klassen']);
+    if (werkbestand) {
+      r.push([{ v: 'groen', stijl: { vulling: KLEUR.planning, kleur: 'FFFFFF', vet: true, midden: true } }, 'Planning: wat is ingepast (Planning), de planningsvolgorde en de lokaalindeling']);
+      r.push([{ v: 'oranje', stijl: { vulling: KLEUR.signalering, kleur: '412402', vet: true, midden: true } }, 'Signaleringen: afhankelijkheden, koppelingen, bezetting (bij invoer en na planning), lokalen per dagdeel en beschikbaarheid']);
+    }
+    r.push([]);
     const regel = (t, u) => r.push([{ v: t, stijl: { vet: true } }, { v: u, stijl: { terugloop: true } }]);
-    regel('Assessments', 'Eén regel per assessment: module, klas/groep, docent(en) en uren. Meerdere docenten scheid je met een puntkomma; zij zijn dan tegelijk nodig. Groepen die los van elkaar worden afgenomen zijn aparte regels. ID mag leeg blijven: de app geeft dan zelf een vaste ID.');
+    regel('Assessments', 'Eén regel per assessment: module, klas/groep, docent(en) en uren. Meerdere docenten scheid je met een puntkomma; zij zijn dan tegelijk nodig. Groepen die los van elkaar worden afgenomen zijn aparte regels.' + (werkbestand ? ' De ID heeft de app gegeven; laat die staan, de planning verwijst ernaar.' : ' Een ID hoef je niet in te vullen: de app geeft elk assessment zelf een vaste ID.'));
     regel('Locaties', 'Kolommen = dagdelen. De rij "Lesuren per dagdeel" bepaalt hoeveel lesuren elk dagdeel heeft. Daaronder per locatie het aantal lokalen per dagdeel waar de app in eerste instantie van uitgaat.');
     regel('Docenten', 'Per docent per dagdeel: + = beschikbaar (wordt groen), leeg = niet beschikbaar. Kies de + uit het keuzelijstje of typ hem (x mag ook). Een docent die hier niet staat, of met een helemaal lege regel, is in alle dagdelen beschikbaar.');
-    regel('Klassen', 'Per klas/groep de locatie (keuzelijst), en per dagdeel: + = beschikbaar, leeg = niet beschikbaar. Een klas die hier niet staat, of met een helemaal lege regel, is overal beschikbaar; zonder locatie meldt de app dat de locatie nog gekozen moet worden.');
+    regel('Klassen', 'Per klas/groep per dagdeel: + = beschikbaar, leeg = niet beschikbaar. Een klas die hier niet staat, of met een helemaal lege regel, is overal beschikbaar. De locatie volgt uit de eerste letter van de klas: A = Apeldoorn, D = Deventer, E = Enschede.' + (werkbestand ? ' De kolom Locatie toont de locatie ter controle; een ingevulde locatie gaat voor de eerste letter.' : ''));
     regel('Instellingen', 'Naam van de planning en de drempel voor een sterke koppeling (standaard 20%).');
     if (werkbestand) {
       regel('Planning', 'Wat al is ingepast: per assessment het dagdeel, het aantal uren en het lokaalnummer. Een assessment dat doorloopt over ochtend en middag staat op twee regels.');
-      regel('Uitvoer', 'De overige tabbladen (Planningsvolgorde t/m Beschikbaarheid) zijn uitvoer van de analyse. Bij het openen in de app worden ze genegeerd en opnieuw berekend.');
+      regel('Uitvoer', 'De groene en oranje tabbladen (behalve Planning) zijn uitvoer van de analyse. Bij het openen in de app worden ze genegeerd en opnieuw berekend. Bezetting staat er twee keer in: bij invoer (alsof er niets gepland is) en na planning.');
     }
     regel('Openen', 'In de app: kies "Excel openen" en selecteer dit bestand. De app herkent zelf of het een invoersjabloon of een werkbestand is.');
     return { naam: 'Toelichting', rijen: r, kolommen: [16, 95] };
@@ -80,17 +108,17 @@
   }
 
   function sjabloonBladen(m) {
-    return [toelichtingBlad(false), instellingenBlad(m, false)].concat(invoerBladen(m, { metIds: false }));
+    return kleurEnOrden([toelichtingBlad(false), instellingenBlad(m, false)].concat(invoerBladen(m, { metIds: false })));
   }
 
   function werkbestandBladen(m, r) {
     const tvLabel = id => (m.tijdvakken.find(t => t.id === id) || { label: id }).label;
     const p = [['ID', 'Module', 'Klas/groep', 'Dagdeel', 'Uren', 'Lokaal'].map(v => ({ v, stijl: KOP }))];
     m.assessments.filter(a => a.gepland.length).forEach(a => a.gepland.forEach(s => p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: tvLabel(s.tv), stijl: { rand: true } }, { v: s.uren, stijl: { rand: true } }, { v: s.lokaal, stijl: { rand: true } }])));
-    return [toelichtingBlad(true), instellingenBlad(m, true)]
+    return kleurEnOrden([toelichtingBlad(true), instellingenBlad(m, true)]
       .concat(invoerBladen(m, { metIds: true, extraRijen: 20 }))
       .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 10, 8, 8], bevries: { y: 1 } }])
-      .concat(AP.export.bladen(m, r));
+      .concat(AP.export.bladen(m, r)));
   }
 
   AP.excelio = { invoerBladen, sjabloonBladen, werkbestandBladen, instellingenBlad };

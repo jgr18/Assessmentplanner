@@ -12,17 +12,18 @@ Webtool die laat zien **in welke volgorde je assessments het best kunt inplannen
 - **Beschikbaarheid** van docenten en van klassen of groepen in een raster per tijdvak.
   - Klik een vakje aan of uit, of plak het raster uit Excel: `naam ⇥ x ⇥ ⇥ x …`. Een kopregel met de tijdvaknamen wordt herkend.
   - Nieuwe docenten en klassen uit de assessmentlijst verschijnen automatisch in het raster.
-- **Locaties**: elke klas zit vast aan één locatie, waar haar assessments worden afgenomen. Standaard zijn er drie locaties: Enschede (5 lokalen per dagdeel), Deventer (3) en Apeldoorn (1). Het aantal lokalen pas je per locatie en per dagdeel aan. Klassen koppel je aan een locatie per klas, via plakken (`klas ⇥ locatie`) of via de vijfde kolom bij de assessments.
+- **Locaties**: elke klas zit vast aan één locatie, waar haar assessments worden afgenomen. Standaard zijn er drie locaties: Enschede (5 lokalen per dagdeel), Deventer (3) en Apeldoorn (1). Het aantal lokalen pas je per locatie en per dagdeel aan. De locatie van een klas volgt uit de eerste letter van de klasnaam (A, D of E). Wijkt een klas af, dan kies je de locatie op het tabblad Locaties, via plakken (`klas ⇥ locatie`) of via de vijfde kolom bij de assessments.
 - **Tijdvakken**: standaard tien dagdelen (ma-o … vr-m) van 6 lesuren, met vrijdagmiddag 5 lesuren: samen 59 lesuren per week. Je kunt ze hernoemen, het aantal uren aanpassen, ze aanvullen of fijner verdelen. Met "Standaarduren toepassen" zet je een eerder gemaakte planning op deze uren, zonder dat beschikbaarheid of planning verloren gaat.
 
 **Analyse**
 - **Capaciteit in uren**: elk dagdeel heeft een aantal lesuren. Een docent of klas kan in één dagdeel meerdere assessments na elkaar hebben, en een lokaal ook. Drie assessments van 2 uur passen dus in één lokaal van 6 lesuren. De tool past assessments in lokalen in, zonder exacte lesuren vast te leggen.
 - **Doorlopen over dagdelen**: een assessment kan doorlopen over aaneengesloten dagdelen van dezelfde dag. Een assessment van 12 uur vult bijvoorbeeld de ochtend en de middag; een van 3 uur kan 2 uur aan het eind van de ochtend en 1 uur aan het begin van de middag beslaan.
 - **Eén locatie per dag**: een docent hoort op één dag op één locatie te zijn. Een plaatsing die dat breekt kan wel, maar krijgt een waarschuwing en komt achteraan in de keuzelijst.
-- **Krapte** per assessment: benodigde uren gedeeld door de uren waarin de klas, alle docenten én een lokaal op de locatie tegelijk vrij zijn.
-- **Bezetting** per docent, klas en locatie: uren die nog nodig zijn gedeeld door de uren die nog vrij zijn. Voor een locatie gaat het om lokaaluren (lokalen × lesuren).
-- **Prioriteit**: de hoogste van de krapte en de bezetting van de betrokken docenten, klas en locatie. Het knelpunt wordt erbij genoemd.
-- **Koppelingen**: twee assessments die een docent (D), klas (K) of de lokalen van een locatie (L) delen, beperken elkaars ruimte. Het gewicht is de bezetting van wat ze delen.
+- **Lokalen tellen niet mee in krapte, prioriteit en afhankelijkheden**: lokalen kun je bijvragen, dus ze zijn minder beperkend dan de beschikbaarheid van docenten en klassen. Een tekort aan lokalen zie je op het tabblad Lokalen; bij het inpassen zoekt de tool wel een vrij lokaal.
+- **Krapte** per assessment: benodigde uren gedeeld door de uren waarin de klas en alle docenten tegelijk vrij zijn.
+- **Bezetting** per docent en klas: uren die nog nodig zijn gedeeld door de uren die nog vrij zijn. Per locatie staat ter informatie ook de bezetting in lokaaluren (lokalen × lesuren).
+- **Prioriteit**: de hoogste van de krapte en de bezetting van de betrokken docenten en klas. Het knelpunt wordt erbij genoemd.
+- **Koppelingen**: twee assessments die een docent (D) of klas (K) delen, beperken elkaars ruimte. Het gewicht is de bezetting van wat ze delen.
 - **Planningseilanden**: groepen assessments die via koppelingen boven de drempel samenhangen. De drempel is instelbaar en staat standaard op 20%. Assessments zonder sterke koppeling zijn **los / vulling**.
 - **Planningsvolgorde**: de eilanden staan op hoogste prioriteit.
   - Binnen een eiland komt eerst het krapste assessment, en daarna steeds het assessment dat het sterkst vastzit aan wat al in de lijst staat.
@@ -46,7 +47,7 @@ Krapte en volgorde zijn een vuistregel ("krapste eerst"), geen garantie dat het 
   - *Planningsvolgorde*, met een kolom om de gekozen planning in te vullen;
   - *Afhankelijkheden*, de matrix met kleuren;
   - *Koppelingen*, alle gedeelde docenten en klassen met percentages;
-  - *Bezetting*, inclusief locaties;
+  - *Bezetting bij invoer* (alsof er nog niets gepland is) en *Bezetting na planning*, beide inclusief locaties;
   - *Lokalen per dagdeel*, met druk en advies voor extra lokalen;
   - *Lokaalindeling* van wat is ingepast;
   - *Beschikbaarheid docenten* en *Beschikbaarheid klassen*.
@@ -56,12 +57,13 @@ Krapte en volgorde zijn een vuistregel ("krapste eerst"), geen garantie dat het 
 
 - **Starten**: open een Excel-bestand met **Excel openen**. Dat kan het **invoersjabloon** zijn of een eerder opgeslagen **werkbestand**; de app herkent zelf welk van de twee. Een leeg sjabloon download je met de knop **Sjabloon**. In de map `voorbeelden` staan een leeg sjabloon, een ingevuld voorbeeld en een voorbeeldwerkbestand.
 - **Invoersjabloon**: de tabbladen Toelichting en Instellingen staan vooraan, daarna de vier invoertabbladen:
-  1. **Assessments**: ID (optioneel) · Module · Klas/groep · Docent(en) gescheiden door `;` · Uren.
+  1. **Assessments**: Module · Klas/groep · Docent(en) gescheiden door `;` · Uren. Een ID vul je niet in: de app geeft elk assessment zelf een vaste ID, die in de uitvoer en het werkbestand staat.
   2. **Locaties**: kolommen zijn de dagdelen. De rij *Lesuren per dagdeel* geeft de lengte van elk dagdeel; daaronder per locatie het aantal lokalen per dagdeel waar de app in eerste instantie van uitgaat.
   3. **Docenten**: per dagdeel een **+** als de docent beschikbaar is (de cel wordt groen); leeg = niet beschikbaar.
-  4. **Klassen**: per klas/groep de locatie en per dagdeel een **+** als de klas beschikbaar is.
+  4. **Klassen**: per klas/groep per dagdeel een **+** als de klas beschikbaar is. De locatie volgt uit de eerste letter van de klas: **A** = Apeldoorn, **D** = Deventer, **E** = Enschede (bijv. E1A, D2B). In het werkbestand staat de locatie ter controle in een extra kolom; daar mag je hem ook overschrijven.
   Wie niet op het tabblad Docenten of Klassen staat, of een helemaal lege regel heeft, is in alle dagdelen beschikbaar. Kies de + uit het keuzelijstje of typ hem; een x mag ook.
 - **Opslaan als Excel** maakt een **werkbestand**: dezelfde invoertabbladen (zo kun je ze in Excel bijwerken en weer openen), het tabblad **Planning** met wat al is ingepast, de **Instellingen**, en alle uitvoer van de analyse. Bij openen leest de app de invoer, de planning en de instellingen en rekent de uitvoer opnieuw uit.
+- **Kleuren van de tabbladen**: grijs = toelichting en instellingen, blauw = invoer, groen = planning (Planning, Planningsvolgorde, Lokaalindeling), oranje = signaleringen (afhankelijkheden, koppelingen, bezetting, lokalen per dagdeel, beschikbaarheid). De tabbladen staan in die volgorde.
 - **Meldingen bij openen** noemen het tabblad, de rij of de cel en een herstelactie. Wat wel klopt, wordt gewoon ingelezen.
 - **Tussendoor** bewaart de browser je werk automatisch (localStorage), alleen op die ene computer.
 

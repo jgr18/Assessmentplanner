@@ -87,6 +87,10 @@
       const m = bouw(regels, d, k, ['ma-o', 'ma-m']); m.tijdvakken.forEach(t => { t.uren = 6; }); m.klassen.forEach(x => { x.locatie = 'Deventer'; }); m.locaties[1].lokalen = 2;
       const r = R.analyseer(m), x = r.lokaaldruk.find(y => y.locatie === 'Deventer' && y.tv === 'T0');
       return { ok: x.extra === 2, detail: 'Deventer ma-o: ' + x.lokalen + ' lokalen, druk ' + Math.round(x.druk * 100) + '%, advies +' + x.extra }; } },
+    { naam: 'Locatie uit eerste letter van de klas', uitleg: 'Klas E1A hoort bij Enschede, D2B bij Deventer en A3A bij Apeldoorn, zonder dat de locatie is ingevuld.', test() {
+      const m = M.leegModel(); M.plakAssessments(m, 'Een\tE1A\tP\t2\nTwee\tD2B\tQ\t2\nDrie\tA3A\tR\t2');
+      const l = ['E1A', 'D2B', 'A3A'].map(k => M.vindRes(m, 'klas', k).locatie);
+      return { ok: l.join(',') === 'Enschede,Deventer,Apeldoorn', detail: l.join(', ') }; } },
     { naam: 'Klas zonder locatie gemeld', uitleg: 'Een klas zonder locatie geeft een fout met herstelactie.', test() {
       const m = M.leegModel(); M.plakAssessments(m, 'Statistiek\t1A\tJansen\t3');
       const r = R.analyseer(m); return { ok: r.fouten.some(f => /locatie/.test(f.melding)), detail: r.fouten.map(f => f.bron).join('; ') }; } }
