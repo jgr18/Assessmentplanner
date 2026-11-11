@@ -214,3 +214,43 @@ table.dsm tr.eilandgrens td, table.dsm tr.eilandgrens th { border-top: 2px solid
 .volle-breedte .matrixkader { max-height: calc(100vh - 330px); }
 .koppelbalk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; min-height: 40px; padding: 8px 12px; border-radius: 8px; background: #F6F9FE; border: 1px solid #DCE6F6; font-size: 13px; }
 table.dsm td .dubbel { font-size: 9px; letter-spacing: -0.02em; }
+.kolomknop { border: 0; background: none; padding: 4px 6px; border-radius: 4px; font-weight: 600; color: var(--tekst-3); font-size: 12px; }
+.kolomknop:hover { background: #EAF1FD; color: #163A85; }
+.vakje { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 22px; padding: 0 3px; border-radius: 4px; font-size: 10px; font-weight: 700; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.vakje.aan { background: #1D9E75; color: #FFFFFF; }
+.vakje.uit { background: #FFFFFF; border: 1px solid #D6D6D1; }
+.vakje.bezet { background: #D3C4F2; color: #2A1A57; }
+table.afdrukrooster th { position: static; font-size: 11px; line-height: 1.2; }
+table.afdrukrooster td.naam { position: static; min-width: 140px; font-size: 12px; }
+@media print { table.rooster th.naam, table.rooster td.naam { position: static; } .tabelkader { overflow: visible; } }
+
+/* Kop en navigatie blijven bovenaan staan bij scrollen */
+.vastekop { position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 0 #D6D6D1; }
+@media print { .vastekop { position: static; box-shadow: none; } }
+
+/* Locaties, lokalen en inplannen */
+.vak.deels { background: repeating-linear-gradient(45deg, #1D9E75, #1D9E75 4px, #5DCAA5 4px, #5DCAA5 8px); border-color: #0F6E56; color: #FFFFFF; font-size: 10px; }
+.vak.bezet { font-size: 10px; }
+.opties { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow: auto; }
+.optie { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid #D6D6D1; border-radius: 6px; background: #FFFFFF; font-size: 13px; cursor: pointer; }
+.optie input { width: 18px; height: 18px; margin: 1px 0 0; flex: none; }
+.optie.let { border-color: #F2D58A; background: #FFFBEF; }
+.waarsch { color: #854F0B; font-size: 12px; font-weight: 600; }
+input.lokaalgetal { width: 46px; padding: 4px 4px; text-align: center; border: 1px solid #D6D6D1; border-radius: 5px; font-weight: 600; }
+input.lokaalgetal.eigen { border-color: #378ADD; background: #E6F1FB; color: #0C447C; }
+table.druktabel td.drukcel { padding: 4px 3px; min-width: 64px; vertical-align: middle; }
+table.druktabel td.drukcel .drukpct { display: block; font-size: 10px; color: var(--tekst-3); margin-top: 2px; }
+table.druktabel td.drukcel .extra { display: inline-block; margin-top: 2px; padding: 0 5px; border-radius: 999px; background: #A32D2D; color: #FFFFFF; font-size: 10px; font-weight: 700; }
+td.drukcel.d1 { background: #FAEEDA; } td.drukcel.d2 { background: #FAC775; } td.drukcel.d3 { background: #F7C1C1; }
+td.drukcel { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.roosteritem { display: inline-block; padding: 2px 6px; margin: 1px 0; border-radius: 4px; background: #D3C4F2; color: #2A1A57; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+table.lijst td .optie input { width: 18px; height: 18px; flex: none; padding: 0; border: 0; margin: 1px 0 0; }
+
+/* Startscherm */
+.startknoppen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .startknoppen { grid-template-columns: 1fr; } }
+.startknop { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; padding: 18px; min-height: 96px; border: 1px solid #C9C9C4; border-radius: 10px; background: #FFFFFF; font-size: 15px; }
+.startknop span { font-size: 12px; color: var(--tekst-3); }
+.startknop:hover { border-color: #1F2328; }
+.startknop.primair { background: var(--donker); color: #FFFFFF; border-color: var(--donker); }
+.startknop.primair span { color: #D3D1C7; }

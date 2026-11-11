@@ -48,7 +48,8 @@
       return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
         '<fonts count="' + fonts.length + '">' + fonts.join('') + '</fonts><fills count="' + fills.length + '">' + fills.join('') + '</fills>' +
         '<borders count="' + borders.length + '">' + borders.join('') + '</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-        '<cellXfs count="' + xfs.length + '">' + xfs.join('') + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+        '<cellXfs count="' + xfs.length + '">' + xfs.join('') + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+        '<dxfs count="1"><dxf><font><b/><color rgb="FFFFFFFF"/></font><fill><patternFill patternType="solid"><fgColor rgb="FF1D9E75"/><bgColor rgb="FF1D9E75"/></patternFill></fill><alignment horizontal="center"/></dxf></dxfs></styleSheet>';
     }
     return { index, xml };
   }
@@ -77,6 +78,12 @@
     });
     x += '</sheetData>';
     if (blad.samenvoegen && blad.samenvoegen.length) x += '<mergeCells count="' + blad.samenvoegen.length + '">' + blad.samenvoegen.map(r => '<mergeCell ref="' + r + '"/>').join('') + '</mergeCells>';
+    /* groen maken: [{ bereik: 'B2:K200', waarden: ['+', 'x'] }] — voorwaardelijke opmaak, ook voor later ingetypte waarden */
+    if (blad.groen && blad.groen.length) blad.groen.forEach((g, gi) => {
+      x += '<conditionalFormatting sqref="' + g.bereik + '">' + g.waarden.map((w, wi) => '<cfRule type="cellIs" dxfId="0" priority="' + (gi * 10 + wi + 1) + '" operator="equal"><formula>"' + esc(w) + '"</formula></cfRule>').join('') + '</conditionalFormatting>';
+    });
+    /* keuzelijsten: [{ bereik: 'B2:K200', lijst: ['ja', 'nee'] }] */
+    if (blad.keuzelijsten && blad.keuzelijsten.length) x += '<dataValidations count="' + blad.keuzelijsten.length + '">' + blad.keuzelijsten.map(k => '<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Ongeldige waarde" error="Kies een waarde uit de lijst." sqref="' + k.bereik + '"><formula1>"' + esc(k.lijst.join(',')) + '"</formula1></dataValidation>').join('') + '</dataValidations>';
     x += '<pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/>';
     if (blad.liggend) x += '<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
     return x + '</worksheet>';
@@ -122,5 +129,5 @@
     return zip(bestanden);
   }
 
-  AP.xlsx = { maak };
+  AP.xlsx = { maak, kolom };
 })(typeof window !== 'undefined' ? window : globalThis);

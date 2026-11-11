@@ -1,4 +1,4 @@
-/* Assessmentplanner — gegevensmodel: tijdvakken, docenten, klassen/groepen, assessments, opslag en validatie. */
+/* Assessmentplanner — gegevensmodel: tijdvakken, locaties met lokalen, docenten, klassen/groepen, assessments, opslag en validatie. */
 (function (root) {
   'use strict';
   const AP = root.AP = root.AP || {};
@@ -12,14 +12,19 @@
     return t;
   }
 
+  function standaardLocaties() {
+    return [{ naam: 'Enschede', lokalen: 5, perTijdvak: {} }, { naam: 'Deventer', lokalen: 3, perTijdvak: {} }, { naam: 'Apeldoorn', lokalen: 1, perTijdvak: {} }];
+  }
+
   function leegModel() {
     return {
-      formaat: 'assessmentplanner', formaatversie: 1, naam: 'Nieuwe planning',
+      formaat: 'assessmentplanner', formaatversie: 2, naam: 'Nieuwe planning',
       invoerversie: 0, volgendeNummer: 1, vervallenIds: [], volgendeTv: 11,
       tijdvakken: standaardTijdvakken(),
+      locaties: standaardLocaties(), // { naam, lokalen (standaard per dagdeel), perTijdvak: { tijdvak-id: aantal } }
       docenten: [],      // { naam, beschikbaar: [tijdvak-id] }
-      klassen: [],       // { naam, beschikbaar: [tijdvak-id] }
-      assessments: [],   // { id, module, klas, docenten: [naam], uren, gepland: [tijdvak-id] }
+      klassen: [],       // { naam, beschikbaar: [tijdvak-id], locatie }
+      assessments: [],   // { id, module, klas, docenten: [naam], uren, gepland: [{ tv, uren, lokaal }] }
       instellingen: { drempel: 0.2 }
     };
   }
@@ -34,12 +39,15 @@
 
   function zorgVoorRes(m, soort, naam) {
     let r = vindRes(m, soort, naam);
-    if (!r) { r = { naam: naam.trim(), beschikbaar: [] }; lijst(m, soort).push(r); return { r, nieuw: true }; }
+    if (!r) { r = { naam: naam.trim(), beschikbaar: m.tijdvakken.map(t => t.id) }; if (soort === 'klas') r.locatie = m.locaties.length === 1 ? m.locaties[0].naam : ''; lijst(m, soort).push(r); return { r, nieuw: true }; } /* nieuw = standaard volledig beschikbaar */
     return { r, nieuw: false };
   }
 
-  /* Plakken: module ⇥ klas/groep ⇥ docent(en) ⇥ uren. Docenten gescheiden door ; of ,
-     Optioneel een ID vooraan (S001). Een kopregel ("module…") wordt overgeslagen. */
+  const vindLoc = (m, naam) => m.locaties.find(l => l.naam.toLowerCase() === String(naam || '').trim().toLowerCase()) || null;
+
+  /* Plakken: module ⇥ klas/groep ⇥ docent(en) ⇥ uren [⇥ locatie]. Docenten gescheiden door ; of ,
+     Optioneel een ID vooraan (S001). Een kopregel ("module…") wordt overgeslagen.
+     Een locatie in de vijfde kolom wordt de locatie van de klas. */
   function plakAssessments(m, tekst) {
     const regels = tekst.split(/\r?\n/), toegevoegd = [], fouten = [], nieuw = { docent: [], klas: [] };
     regels.forEach((ruw, i) => {
@@ -51,18 +59,21 @@
       if (i === 0 && /^(id|module)$/i.test(d[0])) return;
       let id = null;
       if (/^S\d+$/i.test(d[0])) { id = maakId(idNummer(d[0].toUpperCase())); d = d.slice(1); }
-      const [module, klas, docTekst, urenTekst] = d;
+      const [module, klas, docTekst, urenTekst, locTekst] = d;
       if (!module || !klas || !docTekst || urenTekst === undefined) return fout({ melding: 'Te weinig kolommen gevonden (' + d.length + ').', herstel: 'Gebruik per regel: module ⇥ klas/groep ⇥ docent(en) ⇥ uren, gescheiden door tabs (zoals bij plakken uit Excel).' });
       const uren = parseFloat(String(urenTekst).replace(',', '.'));
       if (!(uren > 0)) return fout({ melding: 'Uren "' + urenTekst + '" is geen positief getal.', herstel: 'Vul het aantal uren in, bijvoorbeeld 3 of 1,5.' });
       const docenten = splitsDocenten(docTekst);
       if (!docenten.length) return fout({ melding: 'Geen docent gevonden.', herstel: 'Vul minstens één docent in; meerdere scheid je met een puntkomma.' });
+      const loc = locTekst ? vindLoc(m, locTekst) : null;
+      if (locTekst && !loc) return fout({ melding: 'Onbekende locatie "' + locTekst + '".', herstel: 'Gebruik een van de locaties: ' + m.locaties.map(l => l.naam).join(', ') + ', of voeg de locatie toe op het tabblad Locaties.' });
       if (id) {
         if (vindAss(m, id)) return fout({ melding: 'ID ' + id + ' bestaat al.', herstel: 'Laat de ID weg om een nieuw assessment te maken.' });
         if (m.vervallenIds.includes(id)) return fout({ melding: 'ID ' + id + ' is eerder gebruikt en verwijderd.', herstel: 'Laat de ID weg; je krijgt automatisch een nieuwe.' });
         m.volgendeNummer = Math.max(m.volgendeNummer, idNummer(id) + 1);
       } else id = maakId(m.volgendeNummer++);
       const k = zorgVoorRes(m, 'klas', klas); if (k.nieuw) nieuw.klas.push(k.r.naam);
+      if (loc) k.r.locatie = loc.naam;
       const docNamen = docenten.map(n => { const x = zorgVoorRes(m, 'docent', n); if (x.nieuw) nieuw.docent.push(x.r.naam); return x.r.naam; });
       m.assessments.push({ id, module, klas: k.r.naam, docenten: Array.from(new Set(docNamen)), uren, gepland: [] });
       toegevoegd.push(id);
@@ -109,6 +120,21 @@
     gewijzigd(m);
   }
 
+  /* Snel alles aan/uit: voor een hele lijst, of voor één tijdvak (kolom) bij iedereen. */
+  function zetAllesBeschikbaar(m, soort, aan) {
+    lijst(m, soort).forEach(r => { r.beschikbaar = aan ? m.tijdvakken.map(t => t.id) : []; });
+    gewijzigd(m);
+  }
+  function zetKolomBeschikbaar(m, soort, tv, aan) {
+    lijst(m, soort).forEach(r => {
+      const i = r.beschikbaar.indexOf(tv);
+      if (aan && i < 0) r.beschikbaar.push(tv);
+      if (!aan && i >= 0) r.beschikbaar.splice(i, 1);
+    });
+    gewijzigd(m);
+  }
+  function voegResToe(m, soort, naam) { return zorgVoorRes(m, soort, naam); }
+
   function wijzigAssessment(m, id, veld, waarde) {
     const a = vindAss(m, id); if (!a) return;
     const bron = 'Assessments, ' + id;
@@ -152,13 +178,81 @@
     gewijzigd(m);
   }
 
-  function plan(m, id, tijdvakken) { const a = vindAss(m, id); if (a) { a.gepland = tijdvakken.slice(); gewijzigd(m); } }
+  /* Inplannen: segmenten [{ tv, uren, lokaal }]. Lokaal = nummer 1..n op de locatie van de klas. */
+  function plan(m, id, segmenten) { const a = vindAss(m, id); if (a) { a.gepland = segmenten.map(s => ({ tv: s.tv, uren: s.uren, lokaal: s.lokaal })); gewijzigd(m); } }
+
+  /* Locaties en lokalen */
+  function lokalenIn(m, locNaam, tv) {
+    const l = vindLoc(m, locNaam); if (!l) return 0;
+    return l.perTijdvak && l.perTijdvak[tv] !== undefined ? l.perTijdvak[tv] : l.lokalen;
+  }
+  function zetLokalen(m, locNaam, tv, aantal) {
+    const l = vindLoc(m, locNaam); if (!l) return;
+    const n = aantal === '' || aantal === null || aantal === undefined ? null : Math.max(0, Math.round(Number(String(aantal).replace(',', '.'))));
+    if (n === null || isNaN(n) || n === l.lokalen) delete l.perTijdvak[tv]; else l.perTijdvak[tv] = n;
+    gewijzigd(m);
+  }
+  function wijzigLocatie(m, oud, veld, waarde) {
+    const l = vindLoc(m, oud); if (!l) return;
+    const bron = 'Locaties, ' + oud;
+    if (veld === 'lokalen') {
+      const n = Math.round(Number(String(waarde).replace(',', '.')));
+      if (!(n >= 0)) return { bron, melding: 'Het aantal lokalen moet 0 of meer zijn.', herstel: 'Vul een heel getal in, bijvoorbeeld 3.' };
+      l.lokalen = n; Object.keys(l.perTijdvak).forEach(t => { if (l.perTijdvak[t] === n) delete l.perTijdvak[t]; });
+    } else {
+      const nieuw = String(waarde || '').trim();
+      if (!nieuw) return { bron, melding: 'De naam mag niet leeg zijn.', herstel: 'Vul een naam in.' };
+      if (nieuw.toLowerCase() !== oud.toLowerCase() && vindLoc(m, nieuw)) return { bron, melding: '"' + nieuw + '" bestaat al.', herstel: 'Kies een andere naam.' };
+      m.klassen.forEach(k => { if (k.locatie === l.naam) k.locatie = nieuw; });
+      l.naam = nieuw;
+    }
+    gewijzigd(m);
+  }
+  function voegLocatieToe(m, naam, lokalen) {
+    naam = String(naam || '').trim();
+    if (!naam) return { bron: 'Locaties', melding: 'Geen naam ingevuld.', herstel: 'Vul de naam van de locatie in.' };
+    if (vindLoc(m, naam)) return { bron: 'Locaties', melding: '"' + naam + '" bestaat al.', herstel: 'Kies een andere naam.' };
+    const n = Math.round(Number(String(lokalen).replace(',', '.')));
+    m.locaties.push({ naam, lokalen: n >= 0 ? n : 1, perTijdvak: {} }); gewijzigd(m);
+  }
+  function verwijderLocatie(m, naam) {
+    if (m.klassen.some(k => k.locatie === naam)) return false;
+    m.locaties = m.locaties.filter(l => l.naam !== naam); gewijzigd(m); return true;
+  }
+  function zetKlasLocatie(m, klas, locNaam) {
+    const k = vindRes(m, 'klas', klas); if (!k) return;
+    const l = locNaam ? vindLoc(m, locNaam) : null;
+    if (k.locatie === (l ? l.naam : '')) return;
+    k.locatie = l ? l.naam : '';
+    m.assessments.forEach(a => { if (a.klas === k.naam) a.gepland = []; }); /* andere locatie: planning van die klas vervalt */
+    gewijzigd(m);
+  }
+  /* Plakken: klas ⇥ locatie */
+  function plakKlasLocaties(m, tekst) {
+    const fouten = [], bijgewerkt = [];
+    tekst.split(/\r?\n/).forEach((ruw, i) => {
+      if (!ruw.trim()) return;
+      const [klas, loc] = ruw.split('\t').map(s => (s || '').trim());
+      const bron = 'Klassen en locaties plakken, regel ' + (i + 1);
+      if (i === 0 && /^klas/i.test(klas) && /^locatie/i.test(loc || '')) return;
+      if (!klas || !loc) { fouten.push({ bron, regel: i, melding: 'Verwacht: klas ⇥ locatie.', herstel: 'Zet de klas in de eerste en de locatie in de tweede kolom.' }); return; }
+      const l = vindLoc(m, loc);
+      if (!l) { fouten.push({ bron, regel: i, melding: 'Onbekende locatie "' + loc + '".', herstel: 'Gebruik een van de locaties: ' + m.locaties.map(x => x.naam).join(', ') + '.' }); return; }
+      const k = zorgVoorRes(m, 'klas', klas).r;
+      if (k.locatie !== l.naam) { k.locatie = l.naam; m.assessments.forEach(a => { if (a.klas === k.naam) a.gepland = []; }); }
+      bijgewerkt.push(k.naam);
+    });
+    if (bijgewerkt.length) gewijzigd(m);
+    return { bijgewerkt, fouten };
+  }
   function ontplan(m, id) { const a = vindAss(m, id); if (a) { a.gepland = []; gewijzigd(m); } }
 
   /* Tijdvakken beheren. Een tijdvak verwijderen haalt het ook uit beschikbaarheid en planning. */
   function voegTijdvakToe(m, label, uren) {
     const id = 'T' + (m.volgendeTv++);
-    m.tijdvakken.push({ id, label: label || id, uren: uren > 0 ? uren : 6 }); gewijzigd(m); return id;
+    m.tijdvakken.push({ id, label: label || id, uren: uren > 0 ? uren : 6 });
+    m.docenten.concat(m.klassen).forEach(r => r.beschikbaar.push(id)); /* nieuw tijdvak: standaard iedereen beschikbaar */
+    gewijzigd(m); return id;
   }
   function wijzigTijdvak(m, id, veld, waarde) {
     const t = m.tijdvakken.find(x => x.id === id); if (!t) return;
@@ -175,7 +269,8 @@
   function verwijderTijdvak(m, id) {
     m.tijdvakken = m.tijdvakken.filter(t => t.id !== id);
     m.docenten.concat(m.klassen).forEach(r => { r.beschikbaar = r.beschikbaar.filter(x => x !== id); });
-    m.assessments.forEach(a => { a.gepland = a.gepland.filter(x => x !== id); });
+    m.assessments.forEach(a => { if (a.gepland.some(s => s.tv === id)) a.gepland = []; }); /* planning in dat tijdvak vervalt in zijn geheel */
+    m.locaties.forEach(l => { delete l.perTijdvak[id]; });
     gewijzigd(m);
   }
   function verplaatsTijdvak(m, id, richting) {
@@ -196,14 +291,26 @@
       else ids.add(a.id);
       if (!kl.has(a.klas)) f.push({ bron: p, melding: 'Klas "' + a.klas + '" staat niet in de klassenlijst.', herstel: 'Voeg de klas toe aan "klassen".' });
       (a.docenten || []).forEach(d => { if (!doc.has(d)) f.push({ bron: p, melding: 'Docent "' + d + '" staat niet in de docentenlijst.', herstel: 'Voeg de docent toe aan "docenten".' }); });
-      (a.gepland || []).forEach(t => { if (!tv.has(t)) f.push({ bron: p, melding: 'Gepland in onbekend tijdvak "' + t + '".', herstel: 'Verwijder de planning of voeg het tijdvak toe.' }); });
+      (a.gepland || []).forEach(s => { const t = typeof s === 'string' ? s : s && s.tv; if (!tv.has(t)) f.push({ bron: p, melding: 'Gepland in onbekend tijdvak "' + t + '".', herstel: 'Verwijder de planning of voeg het tijdvak toe.' }); });
     });
     return f;
   }
   function normaliseer(d) {
     const m = Object.assign(leegModel(), d);
     m.instellingen = Object.assign(leegModel().instellingen, d.instellingen || {});
-    m.assessments = m.assessments.map(a => Object.assign({ gepland: [] }, a));
+    if (!Array.isArray(d.locaties)) m.locaties = standaardLocaties();
+    m.locaties = m.locaties.map(l => Object.assign({ lokalen: 1, perTijdvak: {} }, l));
+    m.klassen = m.klassen.map(k => Object.assign({ locatie: '' }, k));
+    const urenTv = {}; m.tijdvakken.forEach(t => { urenTv[t.id] = t.uren; });
+    m.assessments = m.assessments.map(a => {
+      a = Object.assign({ gepland: [] }, a);
+      if (a.gepland.length && typeof a.gepland[0] === 'string') { /* oude planning (hele tijdvakken): omzetten naar uren in lokaal 1 */
+        let rest = a.uren;
+        a.gepland = a.gepland.map(tv => { const u = Math.min(rest, urenTv[tv] || 0); rest -= u; return { tv, uren: u, lokaal: 1 }; }).filter(s => s.uren > 0);
+      }
+      return a;
+    });
+    m.formaatversie = 2;
     const max = m.assessments.concat((m.vervallenIds || []).map(id => ({ id }))).reduce((x, a) => Math.max(x, idNummer(a.id) || 0), 0);
     m.volgendeNummer = Math.max(m.volgendeNummer || 1, max + 1);
     return m;
@@ -216,8 +323,9 @@
   function wisLokaal() { try { root.localStorage.removeItem(OPSLAGSLEUTEL); } catch (e) { /* niets */ } }
 
   AP.model = {
-    leegModel, maakId, vindRes, vindAss, plakAssessments, plakBeschikbaarheid, wisselBeschikbaar, zetRijBeschikbaar,
+    leegModel, maakId, vindRes, vindAss, plakAssessments, plakBeschikbaarheid, wisselBeschikbaar, zetRijBeschikbaar, zetAllesBeschikbaar, zetKolomBeschikbaar, voegResToe,
     wijzigAssessment, verwijderAssessment, gebruikt, verwijderRes, hernoemRes, plan, ontplan,
-    voegTijdvakToe, wijzigTijdvak, standaardUren, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal
+    voegTijdvakToe, wijzigTijdvak, standaardUren, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal,
+    vindLoc, lokalenIn, zetLokalen, wijzigLocatie, voegLocatieToe, verwijderLocatie, zetKlasLocatie, plakKlasLocaties
   };
 })(typeof window !== 'undefined' ? window : globalThis);
