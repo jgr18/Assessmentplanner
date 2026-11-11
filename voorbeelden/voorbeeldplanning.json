@@ -10,52 +10,52 @@
     {
       "id": "ma-o",
       "label": "ma-o",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "ma-m",
       "label": "ma-m",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "di-o",
       "label": "di-o",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "di-m",
       "label": "di-m",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "wo-o",
       "label": "wo-o",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "wo-m",
       "label": "wo-m",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "do-o",
       "label": "do-o",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "do-m",
       "label": "do-m",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "vr-o",
       "label": "vr-o",
-      "uren": 4
+      "uren": 6
     },
     {
       "id": "vr-m",
       "label": "vr-m",
-      "uren": 4
+      "uren": 5
     }
   ],
   "docenten": [

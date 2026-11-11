@@ -158,6 +158,8 @@ dl.gegevens dd { margin: 0; }
 .vinkje input { width: 18px; height: 18px; flex: none; margin: 1px 0 0; }
 
 /* Planner-specifiek */
+table.dsm tbody th .docentnamen { color: var(--tekst-3); }
+table.dsm.met-blok tbody th.naamcel { max-width: 420px; }
 .status.fout { background: #F7C1C1; color: #501313; }
 .status.ok { background: #BFE3CF; color: #0F3D24; }
 .segment { display: inline-flex; border: 1px solid #C9C9C4; border-radius: 6px; overflow: hidden; }
@@ -196,7 +198,19 @@ table.dsm tr.eilandgrens td, table.dsm tr.eilandgrens th { border-top: 2px solid
   .paneel { border: 0; padding: 0; }
   .matrixkader { max-height: none; overflow: visible; border: 0; }
   table.dsm thead th, table.dsm tbody th { position: static; }
+  table.dsm.met-blok tbody th.naamcel { max-width: none; overflow: visible; }
+  table.dsm tbody th .docentnamen { color: #3A3A37; }
   .pagina-breuk { break-before: page; }
   table.dsm td, table.dsm th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   table.lijst td, tr.eilandgrens td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+/* Kleuren altijd meenemen bij afdrukken (legenda, balkjes, labels) */
+.chip, .krapbalk, .vak, .label-ok, .label-let, .label-info, .legenda span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+/* Afhankelijkheden: volle breedte en compacte cellen */
+.inhoud.volle-breedte { max-width: none; }
+.volle-breedte table.dsm { --cel: 24px; }
+.volle-breedte table.dsm thead th { font-size: 9px; }
+.volle-breedte .matrixkader { max-height: calc(100vh - 330px); }
+.koppelbalk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; min-height: 40px; padding: 8px 12px; border-radius: 8px; background: #F6F9FE; border: 1px solid #DCE6F6; font-size: 13px; }
+table.dsm td .dubbel { font-size: 9px; letter-spacing: -0.02em; }

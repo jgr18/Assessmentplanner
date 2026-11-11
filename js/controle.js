@@ -6,6 +6,7 @@
   function bouw(assessments, docenten, klassen, tv) {
     const m = M.leegModel();
     if (tv) { m.tijdvakken = tv.map((l, i) => ({ id: 'T' + i, label: l, uren: 4 })); }
+    else m.tijdvakken.forEach(t => { t.uren = 4; }); /* controles rekenen met vaste blokken van 4 uur */
     const ids = m.tijdvakken.map(t => t.id);
     M.plakAssessments(m, assessments.map(a => a.join('\t')).join('\n'));
     const zet = (soort, obj) => Object.keys(obj).forEach(n => { const r = M.vindRes(m, soort, n) || (soort === 'docent' ? m.docenten : m.klassen)[(soort === 'docent' ? m.docenten : m.klassen).push({ naam: n, beschikbaar: [] }) - 1]; r.beschikbaar = obj[n] === '*' ? ids.slice() : obj[n].map(i => ids[i]); });

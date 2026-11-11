@@ -7,7 +7,8 @@
   function standaardTijdvakken() {
     const dagen = ['ma', 'di', 'wo', 'do', 'vr'], delen = [['o', 'ochtend'], ['m', 'middag']];
     const t = [];
-    dagen.forEach(d => delen.forEach(([k]) => t.push({ id: d + '-' + k, label: d + '-' + k, uren: 4 })));
+    /* Standaard: dagdelen van 6 lesuren, vrijdagmiddag 5 — samen 59 lesuren per week. */
+    dagen.forEach(d => delen.forEach(([k]) => t.push({ id: d + '-' + k, label: d + '-' + k, uren: d === 'vr' && k === 'm' ? 5 : 6 })));
     return t;
   }
 
@@ -157,13 +158,19 @@
   /* Tijdvakken beheren. Een tijdvak verwijderen haalt het ook uit beschikbaarheid en planning. */
   function voegTijdvakToe(m, label, uren) {
     const id = 'T' + (m.volgendeTv++);
-    m.tijdvakken.push({ id, label: label || id, uren: uren > 0 ? uren : 4 }); gewijzigd(m); return id;
+    m.tijdvakken.push({ id, label: label || id, uren: uren > 0 ? uren : 6 }); gewijzigd(m); return id;
   }
   function wijzigTijdvak(m, id, veld, waarde) {
     const t = m.tijdvakken.find(x => x.id === id); if (!t) return;
-    if (veld === 'uren') { const u = parseFloat(String(waarde).replace(',', '.')); if (!(u > 0)) return { bron: 'Tijdvakken, ' + t.label, melding: 'Uren moet een positief getal zijn.', herstel: 'Vul bijvoorbeeld 4 in.' }; t.uren = u; }
+    if (veld === 'uren') { const u = parseFloat(String(waarde).replace(',', '.')); if (!(u > 0)) return { bron: 'Tijdvakken, ' + t.label, melding: 'Uren moet een positief getal zijn.', herstel: 'Vul bijvoorbeeld 6 in.' }; t.uren = u; }
     else { if (!String(waarde).trim()) return { bron: 'Tijdvakken', melding: 'De naam van een tijdvak mag niet leeg zijn.', herstel: 'Vul een naam in, bijvoorbeeld ma-o.' }; t.label = String(waarde).trim(); }
     gewijzigd(m);
+  }
+  /* Zet de uren van de standaard dagdelen terug op 6 (vrijdagmiddag 5); namen, extra tijdvakken, beschikbaarheid en planning blijven. */
+  function standaardUren(m) {
+    const std = {}; standaardTijdvakken().forEach(t => { std[t.id] = t.uren; });
+    let n = 0; m.tijdvakken.forEach(t => { if (std[t.id] !== undefined && t.uren !== std[t.id]) { t.uren = std[t.id]; n++; } });
+    if (n) gewijzigd(m); return n;
   }
   function verwijderTijdvak(m, id) {
     m.tijdvakken = m.tijdvakken.filter(t => t.id !== id);
@@ -211,6 +218,6 @@
   AP.model = {
     leegModel, maakId, vindRes, vindAss, plakAssessments, plakBeschikbaarheid, wisselBeschikbaar, zetRijBeschikbaar,
     wijzigAssessment, verwijderAssessment, gebruikt, verwijderRes, hernoemRes, plan, ontplan,
-    voegTijdvakToe, wijzigTijdvak, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal
+    voegTijdvakToe, wijzigTijdvak, standaardUren, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -12,7 +12,7 @@ Webtool die laat zien **in welke volgorde je assessments het best kunt inplannen
 - **Beschikbaarheid** van docenten en van klassen of groepen in een raster per tijdvak.
   - Klik een vakje aan of uit, of plak het raster uit Excel: `naam ⇥ x ⇥ ⇥ x …`. Een kopregel met de tijdvaknamen wordt herkend.
   - Nieuwe docenten en klassen uit de assessmentlijst verschijnen automatisch in het raster.
-- **Tijdvakken**: standaard tien dagdelen van 4 uur (ma-o … vr-m). Je kunt ze hernoemen, het aantal uren aanpassen, ze aanvullen of fijner verdelen.
+- **Tijdvakken**: standaard tien dagdelen (ma-o … vr-m) van 6 lesuren, met vrijdagmiddag 5 lesuren: samen 59 lesuren per week. Je kunt ze hernoemen, het aantal uren aanpassen, ze aanvullen of fijner verdelen. Met "Standaarduren toepassen" zet je een eerder gemaakte planning op deze uren, zonder dat beschikbaarheid of planning verloren gaat.
 
 **Analyse**
 - **Krapte** per assessment: benodigde uren gedeeld door de uren waarin de klas én alle docenten tegelijk beschikbaar zijn.

@@ -8,7 +8,7 @@
   const getal = (v, stijl) => ({ v: v === Infinity ? 'geen ruimte' : v, stijl: Object.assign({ rand: true }, stijl || {}, v === Infinity ? {} : (stijl && stijl.getal ? {} : {})) });
   const pct = (v, extra) => v === Infinity ? { v: 'geen ruimte', stijl: Object.assign({ rand: true, kleur: '9B2C1C' }, extra) } : { v: Math.round(v * 1000) / 1000, stijl: Object.assign({ rand: true, getal: 9 }, extra) };
   const tvLabel = (m, ids) => ids.map(id => (m.tijdvakken.find(t => t.id === id) || { label: id }).label).join(', ');
-  const letter = k => k.gedeeld.map(g => g.soort === 'docent' ? 'D' : 'K').filter((x, i, a) => a.indexOf(x) === i).join('+');
+  const letter = k => (k.gedeeld.some(g => g.soort === 'docent') ? 'D' : '') + (k.gedeeld.some(g => g.soort === 'klas') ? 'K' : '');
 
   function bladen(m, r) {
     const R = AP.rekenen, datum = new Date().toLocaleString('nl-NL');
@@ -64,7 +64,7 @@
       a.push(rij); vorig = x.eiland;
     });
     a.push([], [{ v: 'Legenda', stijl: { vet: true } }],
-      [{ v: 'D', stijl: { vulling: 'FAC775', kleur: '412402', vet: true, midden: true, rand: true } }, 'Koppeling via gedeelde docent (K = klas, D+K = beide)'],
+      [{ v: 'D', stijl: { vulling: 'FAC775', kleur: '412402', vet: true, midden: true, rand: true } }, 'Koppeling via gedeelde docent (K = klas, DK = beide)'],
       [{ v: '', stijl: { vulling: 'EF9F27', rand: true } }, 'Gedeelde docent/klas ≥ 50% bezet'],
       [{ v: '', stijl: { vulling: 'FAC775', rand: true } }, '30–50% bezet'],
       [{ v: '', stijl: { vulling: 'FAEEDA', rand: true } }, 'Boven de drempel (' + Math.round(r.drempel * 100) + '%) tot 30%'],

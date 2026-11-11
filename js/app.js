@@ -38,6 +38,7 @@
   function render() {
     renderKop();
     document.querySelectorAll('.tabs button').forEach(b => { if (b.dataset.tab === ui.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    inhoud.classList.toggle('volle-breedte', ui.tab === 'matrix' || ui.tab === 'export');
     ({ assessments: renderAssessments, beschikbaarheid: renderBeschikbaarheid, tijdvakken: renderTijdvakken, volgorde: renderVolgorde, matrix: renderMatrix, bezetting: renderBezetting, export: renderExport })[ui.tab]();
   }
   document.querySelector('.tabbalk').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { ui.tab = b.dataset.tab; wisMeldingen(); render(); window.scrollTo(0, 0); } });
@@ -146,10 +147,10 @@
       '<td class="rechts"><button class="knop klein-k" data-tvop="' + t.id + '" aria-label="Omhoog">↑</button> <button class="knop klein-k" data-tvneer="' + t.id + '" aria-label="Omlaag">↓</button> <button class="knop klein-k gevaar" data-tvweg="' + t.id + '" aria-label="Verwijderen">✕</button></td></tr>').join('');
     const totaal = m.tijdvakken.reduce((s, t) => s + t.uren, 0);
     inhoud.innerHTML =
-      '<section class="kolom smal"><div class="paneel"><h2>Tijdvakken</h2><p class="uitleg">De week is verdeeld in tijdvakken. Standaard zijn dat tien dagdelen van 4 uur (ma-o = maandagochtend). Je kunt ze hernoemen, het aantal uren aanpassen, of fijner verdelen, bijvoorbeeld in lesblokken.</p>' +
+      '<section class="kolom smal"><div class="paneel"><h2>Tijdvakken</h2><p class="uitleg">De week is verdeeld in tijdvakken. Standaard zijn dat tien dagdelen van 6 lesuren, met vrijdagmiddag 5 lesuren: samen 59 lesuren per week (ma-o = maandagochtend). Je kunt ze hernoemen, het aantal uren aanpassen, of fijner verdelen, bijvoorbeeld in lesblokken.</p>' +
       '<p class="klein">Tip: begin een naam met de dag (bijvoorbeeld "di 3-4") zodat het beschikbaarheidsrooster per dag een scheidingslijn toont.</p>' +
-      '<p class="klein">Een tijdvak verwijderen haalt het ook uit de beschikbaarheid en de planning.</p></div>' +
-      '<div class="paneel"><h3>Tijdvak toevoegen</h3><div class="raster2"><label class="veld">Naam<input id="tv-naam" placeholder="bijv. za-o"></label><label class="veld">Uren<input id="tv-uren" value="4"></label></div><button class="knop primair" id="tv-voeg">Toevoegen</button></div></section>' +
+      '<p class="klein">Een tijdvak verwijderen haalt het ook uit de beschikbaarheid en de planning.</p><button class="knop" id="tv-standaard">Standaarduren toepassen (6 per dagdeel, vr-m 5)</button><p class="klein">Handig voor een planning die nog met andere uren is gemaakt: beschikbaarheid en planning blijven staan.</p></div>' +
+      '<div class="paneel"><h3>Tijdvak toevoegen</h3><div class="raster2"><label class="veld">Naam<input id="tv-naam" placeholder="bijv. za-o"></label><label class="veld">Uren<input id="tv-uren" value="6"></label></div><button class="knop primair" id="tv-voeg">Toevoegen</button></div></section>' +
       '<section class="paneel breed"><div class="rij tussen"><h2>Tijdvakken in volgorde</h2><span class="klein">' + m.tijdvakken.length + ' tijdvakken · ' + R.fmt(totaal) + ' uur per week</span></div>' +
       '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>Naam</th><th>Uren</th><th class="rechts"></th></tr></thead><tbody>' + rijen + '</tbody></table></div></section>';
   }
@@ -201,47 +202,48 @@
 
   /* ================= AFHANKELIJKHEDEN ================= */
   function gewichtKlasse(w, drempel) { return w === Infinity || w >= 0.5 ? 'w3' : w >= 0.3 ? 'w2' : w > drempel ? 'w1' : 'w0'; }
-  function letter(k) { return k.gedeeld.map(g => g.soort === 'docent' ? 'D' : 'K').filter((x, i, a) => a.indexOf(x) === i).join('+'); }
+  function letter(k) { const d = k.gedeeld.some(g => g.soort === 'docent'), kl = k.gedeeld.some(g => g.soort === 'klas'); return (d ? 'D' : '') + (kl ? 'K' : ''); }
   function matrixHtml(r, klikbaar) {
     const o = r.volgorde;
     let h = '<table class="dsm met-blok"><thead><tr><th class="blokkop">Eiland</th><th class="hoek">assessment</th>' + o.map(x => '<th scope="col" title="' + esc(x.id + ' ' + x.module + ' · ' + x.klas) + '">' + x.id + '</th>').join('') + '</tr></thead><tbody>';
     let vorig = null;
     o.forEach((x, i) => {
       const grens = vorig !== null && x.eiland !== vorig; vorig = x.eiland;
-      h += '<tr' + (grens ? ' class="eilandgrens"' : '') + '><th class="blokcel">' + (x.eiland === 'los' ? 'los' : x.eiland) + '</th><th scope="row" class="naamcel" title="' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '"><span class="id">' + x.id + '</span>' + esc(x.module) + ' · ' + esc(x.klas) + '</th>';
+      h += '<tr' + (grens ? ' class="eilandgrens"' : '') + '><th class="blokcel">' + (x.eiland === 'los' ? 'los' : x.eiland) + '</th><th scope="row" class="naamcel" title="' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '"><span class="id">' + x.id + '</span>' + esc(x.module) + ' · <b>' + esc(x.klas) + '</b> <span class="docentnamen">· ' + esc(x.docenten.join('; ')) + '</span></th>';
       o.forEach((y, j) => {
         if (i === j) { h += '<td class="diag"></td>'; return; }
         const k = r.kop(x.id, y.id);
         if (!k) { h += '<td' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + '></td>'; return; }
         const cls = gewichtKlasse(k.gewicht, r.drempel);
-        h += '<td class="' + cls + '"' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + ' title="' + esc(k.gedeeld.map(g => (g.soort === 'docent' ? 'docent ' : 'klas ') + g.naam + ' ' + R.fmtGraad(g.graad)).join(', ')) + '">' + (cls === 'w0' ? '·' : letter(k)) + '</td>';
+        h += '<td class="' + cls + '"' + (klikbaar ? ' data-i="' + i + '" data-j="' + j + '"' : '') + ' title="' + esc(k.gedeeld.map(g => (g.soort === 'docent' ? 'docent ' : 'klas ') + g.naam + ' ' + R.fmtGraad(g.graad)).join(', ')) + '">' + (cls === 'w0' ? '·' : (letter(k).length > 1 ? '<span class="dubbel">' + letter(k) + '</span>' : letter(k))) + '</td>';
       });
       h += '</tr>';
     });
     return h + '</tbody></table>';
   }
   function legendaMatrix(r) {
-    return '<div class="legenda"><span><span class="chip" style="background:#EF9F27"></span>Gedeelde docent/klas ≥ 50% bezet</span><span><span class="chip" style="background:#FAC775"></span>30–50%</span><span><span class="chip" style="background:#FAEEDA"></span>' + Math.round(r.drempel * 100) + '–30%</span><span>· zwak (telt niet voor eilanden)</span><span>D = via docent · K = via klas</span><span>Dikke lijn = grens planningseiland</span></div>';
+    return '<div class="legenda"><span><span class="chip" style="background:#EF9F27"></span>Gedeelde docent/klas ≥ 50% bezet</span><span><span class="chip" style="background:#FAC775"></span>30–50%</span><span><span class="chip" style="background:#FAEEDA"></span>' + Math.round(r.drempel * 100) + '–30%</span><span>· zwak (telt niet voor eilanden)</span><span>D = via docent · K = via klas · DK = beide</span><span>Dikke lijn = grens planningseiland</span></div>';
   }
   function renderMatrix() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe.</section>'; return; }
     const r = analyse();
-    inhoud.innerHTML = '<section class="paneel breed"><h2>Afhankelijkheden tussen nog te plannen assessments</h2>' +
+    inhoud.innerHTML = '<section class="paneel" style="flex:1 1 100%"><h2>Afhankelijkheden tussen nog te plannen assessments</h2>' +
       '<p class="klein">Rijen en kolommen staan in planningsvolgorde. Een gevulde cel betekent: deze twee assessments delen een docent (D) of klas (K) en beperken dus elkaars ruimte. De kleur toont hoe druk die gedeelde docent of klas is.</p>' + legendaMatrix(r) +
-      '<div class="matrixkader" id="pm">' + matrixHtml(r, true) + '</div></section>' +
-      '<aside class="kolom smal"><div class="paneel" id="mpaneel"></div></aside>';
+      '<div id="mpaneel" class="koppelbalk"></div>' +
+      '<div class="matrixkader" id="pm">' + matrixHtml(r, true) + '</div></section>';
     renderMatrixPaneel(r);
   }
   function renderMatrixPaneel(r) {
     const p = $('#mpaneel'); if (!p) return;
-    if (!ui.matrixSel) { p.innerHTML = '<h2>Koppeling</h2><p class="uitleg">Klik een cel in de matrix om te zien wat twee assessments delen.</p>'; return; }
+    if (!ui.matrixSel) { p.innerHTML = '<span class="klein">Klik een cel in de matrix om hier te zien wat twee assessments delen.</span>'; return; }
     const [x, y] = ui.matrixSel.map(id => r.volgorde.find(v => v.id === id));
     if (!x || !y) { ui.matrixSel = null; return renderMatrixPaneel(r); }
     const k = r.kop(x.id, y.id);
-    p.innerHTML = '<div class="rij tussen"><h2>Koppeling</h2><span class="celkop">' + x.id + ' · ' + y.id + '</span></div>' +
-      '<dl class="gegevens"><dt>' + x.id + '</dt><dd>' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '</dd><dt>' + y.id + '</dt><dd>' + esc(y.module + ' · ' + y.klas + ' · ' + y.docenten.join('; ')) + '</dd>' +
-      (k ? k.gedeeld.map(g => '<dt>Gedeeld</dt><dd>' + (g.soort === 'docent' ? 'docent ' : 'klas ') + '<b>' + esc(g.naam) + '</b> · bezetting ' + R.fmtGraad(g.graad) + '</dd>').join('') +
-        '<dt>Telt voor eiland</dt><dd>' + (k.gewicht > r.drempel ? 'ja (boven ' + Math.round(r.drempel * 100) + '%)' : 'nee, zwakke koppeling') + '</dd>' : '<dt>Gedeeld</dt><dd>niets: deze twee beïnvloeden elkaar niet</dd>') + '</dl>';
+    p.innerHTML = '<span class="celkop">' + x.id + ' · ' + y.id + '</span>' +
+      '<span><b>' + x.id + '</b> ' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '</span>' +
+      '<span><b>' + y.id + '</b> ' + esc(y.module + ' · ' + y.klas + ' · ' + y.docenten.join('; ')) + '</span>' +
+      (k ? k.gedeeld.map(g => '<span>Gedeeld: ' + (g.soort === 'docent' ? 'docent ' : 'klas ') + '<b>' + esc(g.naam) + '</b> · bezetting ' + R.fmtGraad(g.graad) + '</span>').join('') +
+        '<span>' + (k.gewicht > r.drempel ? 'Telt mee voor het eiland (boven ' + Math.round(r.drempel * 100) + '%)' : 'Zwakke koppeling: telt niet mee voor eilanden') + '</span>' : '<span>Niets gedeeld: deze twee beïnvloeden elkaar niet</span>');
   }
 
   /* ================= BEZETTING ================= */
@@ -307,7 +309,8 @@
       if (op) { M.verplaatsTijdvak(m, op.dataset.tvop, -1); na(); renderTijdvakken(); return; }
       if (neer) { M.verplaatsTijdvak(m, neer.dataset.tvneer, 1); na(); renderTijdvakken(); return; }
       if (weg) { if (!confirm('Tijdvak "' + tv(weg.dataset.tvweg).label + '" verwijderen? Het verdwijnt ook uit beschikbaarheid en planning.')) return; M.verwijderTijdvak(m, weg.dataset.tvweg); na(); renderTijdvakken(); return; }
-      if (t.id === 'tv-voeg') { const naam = $('#tv-naam').value.trim(), u = parseFloat($('#tv-uren').value.replace(',', '.')); if (!naam) { toonFouten([{ bron: 'Tijdvakken', melding: 'Geen naam ingevuld.', herstel: 'Vul een naam in, bijvoorbeeld za-o.' }]); return; } if (!(u > 0)) { toonFouten([{ bron: 'Tijdvakken', melding: 'Uren moet een positief getal zijn.', herstel: 'Vul bijvoorbeeld 4 in.' }]); return; } M.voegTijdvakToe(m, naam, u); na(); renderTijdvakken(); }
+      if (t.id === 'tv-standaard') { const n = M.standaardUren(m); na(); renderTijdvakken(); toonOk(n ? n + ' tijdvak(ken) aangepast naar de standaarduren.' : 'De tijdvakken hadden de standaarduren al.'); return; }
+      if (t.id === 'tv-voeg') { const naam = $('#tv-naam').value.trim(), u = parseFloat($('#tv-uren').value.replace(',', '.')); if (!naam) { toonFouten([{ bron: 'Tijdvakken', melding: 'Geen naam ingevuld.', herstel: 'Vul een naam in, bijvoorbeeld za-o.' }]); return; } if (!(u > 0)) { toonFouten([{ bron: 'Tijdvakken', melding: 'Uren moet een positief getal zijn.', herstel: 'Vul bijvoorbeeld 6 in.' }]); return; } M.voegTijdvakToe(m, naam, u); na(); renderTijdvakken(); }
       return;
     }
     if (ui.tab === 'volgorde') {
