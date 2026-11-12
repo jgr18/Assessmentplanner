@@ -160,7 +160,8 @@
           if (!(uren > 0)) return fout(bron, 'Uren "' + tekst(r[pUren]) + '" is geen positief getal.', 'Vul het aantal uren in.');
           const klas = m.klassen.find(k => k.naam === a.klas), max = klas && klas.locatie ? AP.model.lokalenIn(m, klas.locatie, tv) : 0;
           if (!klas || !klas.locatie) return fout(bron, 'Klas ' + a.klas + ' van ' + id + ' heeft geen (geldige) locatie; de planning is niet overgenomen.', 'Kies de locatie van ' + a.klas + ' op het tabblad Klassen.');
-          if (!(lokaal >= 1) || lokaal > max) return fout(bron, 'Lokaal ' + tekst(r[pLok]) + ' bestaat niet in ' + klas.locatie + ' op ' + tekst(r[pDag]) + ' (' + max + ' lokalen).', 'Pas het lokaalnummer aan, of verhoog het aantal lokalen op het tabblad Locaties.');
+          if (!(lokaal >= 1)) return fout(bron, 'Lokaal "' + tekst(r[pLok]) + '" is geen lokaalnummer.', 'Vul een lokaalnummer in (1, 2, …). Een nummer boven het aantal lokalen betekent: extra lokaal nodig.');
+          if (lokaal > max) let_op(bron, id + ' staat in lokaal ' + Math.round(lokaal) + ', maar ' + klas.locatie + ' heeft op ' + tekst(r[pDag]) + ' ' + max + ' lokalen. Dit telt als extra lokaal nodig.', 'Vraag het lokaal aan en verhoog het aantal lokalen op het tabblad Locaties, of plan ' + id + ' anders.');
           (segs[id] = segs[id] || []).push({ tv, uren, lokaal: Math.round(lokaal) });
         });
         Object.keys(segs).forEach(id => {

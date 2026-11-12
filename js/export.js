@@ -10,7 +10,7 @@
   const tvLabel = (m, ids) => ids.map(id => (m.tijdvakken.find(t => t.id === id) || { label: id }).label).join(', ');
   const letter = (k, drempel) => { const s = k.gedeeld.filter(g => g.graad > drempel).map(g => g.soort); return (s.includes('docent') ? 'D' : '') + (s.includes('klas') ? 'K' : '') + (s.includes('locatie') ? 'L' : ''); };
   const resNaam = g => (g.soort === 'docent' ? 'docent ' : g.soort === 'klas' ? 'klas ' : 'lokalen ') + g.naam;
-  const segTekst = (m, segs) => segs.map(s => (m.tijdvakken.find(t => t.id === s.tv) || { label: s.tv }).label + ' ' + String(s.uren).replace('.', ',') + 'u lokaal ' + s.lokaal).join(' + ');
+  const segTekst = (m, segs) => segs.map(s => (m.tijdvakken.find(t => t.id === s.tv) || { label: s.tv }).label + ' ' + String(s.uren).replace('.', ',') + 'u ' + (s.extra ? 'extra lokaal nodig' : 'lokaal ' + s.lokaal)).join(' + ');
 
   function bladen(m, r) {
     const R = AP.rekenen, datum = new Date().toLocaleString('nl-NL');
@@ -125,8 +125,8 @@
       ld.push([{ v: '', stijl: { rand: true } }, { v: 'Extra nodig', stijl: { rand: true } }].concat(m.tijdvakken.map(t => { const x = cel(t); return { v: x.extra ? '+' + x.extra : '', stijl: Object.assign({ rand: true, midden: true }, x.extra ? { vet: true, kleur: 'A32D2D' } : {}) }; }), [{ v: '', stijl: { rand: true } }]));
     });
     if (r.lokaalTekort.length) {
-      ld.push([], [{ v: 'Geen lokaal vrij voor', stijl: { vet: true } }]);
-      r.lokaalTekort.forEach(x => ld.push([{ v: x.id, stijl: { vet: true } }, x.module + ' · ' + x.klas + ' · ' + String(x.uren).replace('.', ',') + 'u op ' + x.locatie + '; klas en docent(en) kunnen in ' + x.tijdvakken.slice(0, 4).map(t => (m.tijdvakken.find(y => y.id === t) || { label: t }).label).join(', ')]));
+      ld.push([], [{ v: 'Extra lokaal nodig (ingepland zonder vrij lokaal)', stijl: { vet: true } }]);
+      r.lokaalTekort.forEach(x => ld.push([{ v: x.id, stijl: { vet: true } }, x.module + ' · ' + x.klas + ' · ' + String(x.uren).replace('.', ',') + 'u op ' + x.locatie + ' in ' + (m.tijdvakken.find(y => y.id === x.tv) || { label: x.tv }).label + ' (lokaal ' + x.lokaal + ', boven het aantal lokalen)']));
     }
 
     /* 8. Lokaalindeling van wat ingepast is */
@@ -136,7 +136,7 @@
       const p = r.lokaalRooster[loc][t.id]; if (!p) return;
       Object.keys(p).map(Number).sort((x, y) => x - y).forEach(n => {
         const lijst = p[n], geb = lijst.reduce((s, x) => s + x.uren, 0);
-        li.push([{ v: loc, stijl: { rand: true, vet: true } }, { v: t.label, stijl: { rand: true } }, { v: n, stijl: { rand: true, midden: true } }, { v: lijst.map(x => x.id + ' (' + String(x.uren).replace('.', ',') + 'u ' + x.module + ' ' + x.klas + ')').join('; '), stijl: { rand: true, vulling: 'EEEDFE' } }, { v: geb, stijl: { rand: true } }, { v: t.uren - geb, stijl: { rand: true } }]);
+        li.push([{ v: loc, stijl: { rand: true, vet: true } }, { v: t.label, stijl: { rand: true } }, { v: n > AP.model.lokalenIn(m, loc, t.id) ? n + ' (extra)' : n, stijl: Object.assign({ rand: true, midden: true }, n > AP.model.lokalenIn(m, loc, t.id) ? { vulling: 'F7C1C1', vet: true } : {}) }, { v: lijst.map(x => x.id + ' (' + String(x.uren).replace('.', ',') + 'u ' + x.module + ' ' + x.klas + ')').join('; '), stijl: { rand: true, vulling: 'EEEDFE' } }, { v: geb, stijl: { rand: true } }, { v: t.uren - geb, stijl: { rand: true } }]);
       });
     }));
     if (li.length === 5) li.push(['Nog niets ingepland.']);

@@ -60,11 +60,14 @@
       M.plan(m, 'S001', [{ tv: 'T0', uren: 2, lokaal: 1 }]); M.plan(m, 'S002', [{ tv: 'T0', uren: 2, lokaal: 1 }]);
       const r = R.analyseer(m), it = r.volgorde[0];
       return { ok: it.past && it.opties[0].segmenten[0].lokaal === 1, detail: 'S003: ' + (it.opties[0] ? 'lokaal ' + it.opties[0].segmenten[0].lokaal + ', ' + it.opties[0].segmenten[0].uren + ' u' : 'past niet') }; } },
-    { naam: 'Twee van 4 uur passen niet samen in één lokaal', uitleg: 'Bij 1 lokaal van 6 lesuren past na een assessment van 4 uur geen tweede van 4 uur; dat wordt gemeld als lokaaltekort.', test() {
+    { naam: 'Geen lokaal vrij is geen beletsel, wel een melding', uitleg: 'Bij 1 lokaal van 6 lesuren past na een assessment van 4 uur geen tweede van 4 uur in dat lokaal. Het tweede kan toch worden ingepland, in een extra lokaal; daarna volgt de melding dat er een lokaal extra nodig is.', test() {
       const m = bouw([['A', '1A', 'P', '4'], ['B', '1B', 'Q', '4']], { P: [0], Q: [0] }, { '1A': [0], '1B': [0] }, ['ma-o']);
-      m.tijdvakken[0].uren = 6; m.klassen.forEach(k => { k.locatie = 'Deventer'; });
+      m.tijdvakken[0].uren = 6; m.klassen.forEach(k => { k.locatie = 'Deventer'; }); m.locaties.find(l => l.naam === 'Deventer').lokalen = 1;
       M.plan(m, 'S001', [{ tv: 'T0', uren: 4, lokaal: 1 }]);
-      const r = R.analyseer(m); return { ok: !r.volgorde[0].past && r.lokaalTekort.length === 1 && r.lokaaldruk.find(x => x.locatie === 'Deventer').extra >= 1, detail: r.fouten.map(f => f.melding).join(' ') }; } },
+      const r = R.analyseer(m), it = r.volgorde[0], o = it.opties[0];
+      if (!it.past || !o.extraLokaal || o.segmenten[0].lokaal !== 2) return { ok: false, detail: 'optie: ' + JSON.stringify(o) };
+      M.plan(m, 'S002', o.segmenten); const r2 = R.analyseer(m);
+      return { ok: r2.lokaalTekort.length === 1 && r2.lokaaldruk.find(x => x.locatie === 'Deventer').extra >= 1 && r2.waarschuwingen.some(w => /extra nodig/.test(w.melding)), detail: r2.waarschuwingen.map(w => w.melding).join(' ') }; } },
     { naam: 'Doorlopen over ochtend en middag', uitleg: 'Een assessment van 12 uur vult ochtend (6) en middag (6) van dezelfde dag.', test() {
       const m = bouw([['Groot', '1A', 'P', '12']], { P: '*' }, { '1A': '*' }, ['ma-o', 'ma-m', 'di-o', 'di-m']);
       m.tijdvakken.forEach(t => { t.uren = 6; });

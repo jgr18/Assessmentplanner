@@ -114,7 +114,7 @@
   function werkbestandBladen(m, r) {
     const tvLabel = id => (m.tijdvakken.find(t => t.id === id) || { label: id }).label;
     const p = [['ID', 'Module', 'Klas/groep', 'Dagdeel', 'Uren', 'Lokaal'].map(v => ({ v, stijl: KOP }))];
-    m.assessments.filter(a => a.gepland.length).forEach(a => a.gepland.forEach(s => p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: tvLabel(s.tv), stijl: { rand: true } }, { v: s.uren, stijl: { rand: true } }, { v: s.lokaal, stijl: { rand: true } }])));
+    m.assessments.filter(a => a.gepland.length).forEach(a => a.gepland.forEach(s => p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: tvLabel(s.tv), stijl: { rand: true } }, { v: s.uren, stijl: { rand: true } }, { v: s.lokaal, stijl: Object.assign({ rand: true }, a.klas && AP.model.lokalenIn(m, (m.klassen.find(k => k.naam === a.klas) || {}).locatie || '', s.tv) < s.lokaal ? { vulling: 'F7C1C1', vet: true } : {}) }])));
     return kleurEnOrden([toelichtingBlad(true), instellingenBlad(m, true)]
       .concat(invoerBladen(m, { metIds: true, extraRijen: 20 }))
       .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 10, 8, 8], bevries: { y: 1 } }])

@@ -52,13 +52,23 @@
 
     const beschikbaar = (soort, naam, tv) => { const r = M().vindRes(m, soort, naam); return !!r && r.beschikbaar.includes(tv); };
     const persRest = (soort, naam, tv) => beschikbaar(soort, naam, tv) ? Math.max(0, U[tv] - ((gebruik[soort][naam] || {})[tv] || 0)) : 0;
+    /* Lokalen: nummers boven het aantal lokalen op de locatie zijn extra lokalen (nog aan te vragen).
+       Een extra lokaal kan, net als een gewoon lokaal, door meerdere assessments gedeeld worden. */
     const lokaalRests = (loc, tv) => {
       const n = M().lokalenIn(m, loc, tv), g = (lokaalGebruik[loc] || {})[tv] || {}, r = [];
-      for (let i = 1; i <= n; i++) r.push(Math.max(0, U[tv] - (g[i] || 0)));
+      const hoogste = Object.keys(g).map(Number).filter(x => x > 0).reduce((x, v) => Math.max(x, v), 0);
+      for (let i = 1; i <= Math.max(n, hoogste); i++) r.push(Math.max(0, U[tv] - (g[i] || 0)));
       return r;
     };
-    const maxLokaalRest = (loc, tv) => lokaalRests(loc, tv).reduce((x, v) => Math.max(x, v), 0);
-    const besteLokaal = (loc, tv, u) => { let best = null, rest = Infinity; lokaalRests(loc, tv).forEach((v, i) => { if (v >= u && v < rest) { rest = v; best = i + 1; } }); return best; };
+    const maxLokaalRest = (loc, tv) => lokaalRests(loc, tv).slice(0, M().lokalenIn(m, loc, tv)).reduce((x, v) => Math.max(x, v), 0);
+    /* best passende gewone lokaal; anders een al gebruikt extra lokaal; anders een nieuw extra lokaal */
+    const besteLokaal = (loc, tv, u) => {
+      const n = M().lokalenIn(m, loc, tv), rests = lokaalRests(loc, tv);
+      const zoek = (van, tot) => { let best = null, rest = Infinity; for (let i = van; i < tot; i++) if (rests[i] >= u && rests[i] < rest) { rest = rests[i]; best = i + 1; } return best; };
+      return zoek(0, n) || zoek(n, rests.length) || rests.length + 1;
+    };
+    const isExtra = (loc, tv, lokaal) => lokaal > M().lokalenIn(m, loc, tv);
+    const restIn = (loc, tv, lokaal) => { const v = lokaalRests(loc, tv)[lokaal - 1]; return v === undefined ? U[tv] : v; };
 
     /* --- per assessment: capaciteit per tijdvak, plaatsingsopties --- */
     function mensenCap(a, tv) { let c = persRest('klas', a.klas, tv); a.docenten.forEach(d => { c = Math.min(c, persRest('docent', d, tv)); }); return c; }
@@ -69,13 +79,15 @@
     }
     function opties(a) {
       const loc = locVan(a.klas), uit = []; if (!loc) return uit;
-      const cap = tv => Math.min(mensenCap(a, tv), maxLokaalRest(loc, tv));
+      const cap = tv => mensenCap(a, tv); /* lokalen zijn geen grens: zonder vrij lokaal volgt de melding 'extra lokaal nodig' */
+      const markeer = segs => { segs.forEach(s => { if (isExtra(loc, s.tv, s.lokaal)) s.extra = true; }); return segs; };
       const waarsch = tv => { const w = locatieWissel(a, dag[tv]); return w.length ? 'Op ' + dag[tv] + ' al op een andere locatie: ' + w.join(', ') : ''; };
       TV.forEach((t, i) => {
         /* in één tijdvak */
         if (cap(t.id) >= a.uren) {
           const lk = besteLokaal(loc, t.id, a.uren);
-          uit.push({ segmenten: [{ tv: t.id, uren: a.uren, lokaal: lk }], span: false, waarschuwing: waarsch(t.id), restNa: lokaalRests(loc, t.id)[lk - 1] - a.uren, start: i });
+          const segs = markeer([{ tv: t.id, uren: a.uren, lokaal: lk }]);
+          uit.push({ segmenten: segs, span: false, waarschuwing: waarsch(t.id), extraLokaal: segs.some(s => s.extra), restNa: restIn(loc, t.id, lk) - a.uren, start: i });
         }
         /* doorlopend over aaneengesloten tijdvakken van dezelfde dag: eerste deel aan het eind, middelste vol, laatste aan het begin */
         let midden = 0;
@@ -90,10 +102,8 @@
               /* liefst hetzelfde lokaal voor alle delen */
               const n = Math.min.apply(null, segs.map(s => M().lokalenIn(m, loc, s.tv)));
               for (let l = 1; l <= n; l++) if (segs.every(s => lokaalRests(loc, s.tv)[l - 1] >= s.uren)) { segs.forEach(s => { s.lokaal = l; }); break; }
-              if (segs.every(s => s.lokaal)) {
-                const w = waarsch(t.id);
-                uit.push({ segmenten: segs, span: true, waarschuwing: w, restNa: 0, start: i });
-              }
+              markeer(segs);
+              uit.push({ segmenten: segs, span: true, waarschuwing: waarsch(t.id), extraLokaal: segs.some(s => s.extra), restNa: 0, start: i });
               break;
             }
           }
@@ -102,7 +112,7 @@
           if (midden >= a.uren) break;
         }
       });
-      uit.sort((p, q) => (!!p.waarschuwing - !!q.waarschuwing) || (p.span - q.span) || (p.restNa - q.restNa) || (p.start - q.start));
+      uit.sort((p, q) => (!!p.waarschuwing - !!q.waarschuwing) || (!!p.extraLokaal - !!q.extraLokaal) || (p.span - q.span) || (p.restNa - q.restNa) || (p.start - q.start));
       return uit;
     }
 
@@ -151,17 +161,14 @@
       res.forEach(r => { if (r.graad > prio) { prio = r.graad; knelpunt = (r.soort === 'docent' ? 'docent ' : r.soort === 'klas' ? 'klas ' : 'lokalen ') + r.naam; } });
       const bron = 'Assessment ' + a.id + ' (' + a.module + ', ' + a.klas + ')';
       if (!opt.length && loc) {
-        if (overlapMensen >= a.uren || TV.some(t => mensenCap(a, t.id) >= Math.min(a.uren, t.uren))) {
-          const kandidaten = TV.filter(t => mensenCap(a, t.id) >= Math.min(a.uren, t.uren) && !locatieWissel(a, dag[t.id]).length).sort((p, q) => mensenCap(a, q.id) - mensenCap(a, p.id)).map(t => t.id);
-          lokaalTekort.push({ id: a.id, module: a.module, klas: a.klas, locatie: loc, uren: a.uren, tijdvakken: kandidaten });
-          fouten.push({ bron, melding: 'Klas en docent(en) kunnen wel, maar op ' + loc + ' is in die dagdelen geen lokaal meer vrij voor ' + fmt(a.uren) + ' uur.', herstel: 'Vraag een extra lokaal aan in ' + (kandidaten.slice(0, 3).map(t => TV[idx[t]].label).join(', ') || 'een geschikt dagdeel') + ' (tabblad Lokalen).' });
-        } else {
+        {
           fouten.push({ bron, melding: (a.docenten.length > 1 ? 'Klas en docenten zijn' : 'Klas en docent zijn') + ' samen maar ' + fmt(overlapMensen) + ' uur tegelijk vrij' + (geplandeAss.length ? ' (na de al geplande assessments)' : '') + '; nodig is ' + fmt(a.uren) + ' uur, in één dagdeel of doorlopend op één dag.', herstel: 'Breid de beschikbaarheid van ' + [a.klas].concat(a.docenten).join(', ') + ' uit, of verdeel het assessment.' });
         }
       } else if (opt.length && !zonderWissel.length) {
         waarschuwingen.push({ bron, melding: 'Past alleen als een docent die dag op twee locaties is.', herstel: 'Plan bij voorkeur eerst anders, of accepteer de locatiewissel bij het inplannen.' });
       }
-      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, opties: opt, res };
+      const capPerTv = {}; TV.forEach(t => { capPerTv[t.id] = locatieWissel(a, dag[t.id]).length ? -mensenCap(a, t.id) : mensenCap(a, t.id); });
+      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, alleenMetExtraLokaal: opt.length > 0 && opt.every(o => o.extraLokaal), opties: opt, res, capPerTv };
     });
 
     /* --- koppelingen --- */
@@ -224,14 +231,20 @@
       const extra = Math.max(0, Math.ceil((totaal - capaciteit) / t.uren - 1e-9));
       lokaaldruk.push({ locatie: l.naam, tv: t.id, lokalen, standaard: l.lokalen, aangepast: l.perTijdvak[t.id] !== undefined, capaciteit, gepland, verwacht: vw, druk, extra });
     }));
-    /* harde tekorten tellen mee in het advies */
-    lokaalTekort.forEach(x => {
-      const tv = x.tijdvakken[0]; if (!tv) return;
-      const d = lokaaldruk.find(r => r.locatie === x.locatie && r.tv === tv);
-      if (d) { d.extra = Math.max(d.extra, 1); d.tekort = (d.tekort || []).concat(x.id); }
+    /* ingeplande assessments in een extra lokaal: daar is echt een lokaal extra nodig */
+    geplandeAss.forEach(a => {
+      const loc = locVan(a.klas);
+      a.gepland.forEach(s => { if (U[s.tv] !== undefined && loc && isExtra(loc, s.tv, s.lokaal)) lokaalTekort.push({ id: a.id, module: a.module, klas: a.klas, locatie: loc, uren: s.uren, tv: s.tv, lokaal: s.lokaal }); });
     });
+    m.locaties.forEach(l => TV.forEach(t => {
+      const n = M().lokalenIn(m, l.naam, t.id), extraLokalen = new Set(lokaalTekort.filter(x => x.locatie === l.naam && x.tv === t.id).map(x => x.lokaal)).size;
+      if (!extraLokalen) return;
+      const d = lokaaldruk.find(r => r.locatie === l.naam && r.tv === t.id);
+      d.extra = Math.max(d.extra, extraLokalen); d.tekort = lokaalTekort.filter(x => x.locatie === l.naam && x.tv === t.id).map(x => x.id);
+      waarschuwingen.push({ bron: 'Lokalen, ' + l.naam + ' ' + t.label, melding: 'Er is ' + (extraLokalen > 1 ? extraLokalen + ' lokalen' : 'een lokaal') + ' extra nodig (nu ' + n + '): ' + d.tekort.join(', ') + ' ' + (d.tekort.length > 1 ? 'zijn' : 'is') + ' ingepland zonder vrij lokaal.', herstel: 'Vraag het extra lokaal aan en verhoog daarna het aantal lokalen voor dit dagdeel op het tabblad Lokalen.' });
+    }));
 
-    const gepland = geplandeAss.map(a => ({ id: a.id, module: a.module, klas: a.klas, locatie: locVan(a.klas), docenten: a.docenten.slice(), uren: a.uren, segmenten: a.gepland.map(s => Object.assign({}, s)) }));
+    const gepland = geplandeAss.map(a => ({ id: a.id, module: a.module, klas: a.klas, locatie: locVan(a.klas), docenten: a.docenten.slice(), uren: a.uren, segmenten: a.gepland.map(s => Object.assign({}, s, locVan(a.klas) && U[s.tv] !== undefined && isExtra(locVan(a.klas), s.tv, s.lokaal) ? { extra: true } : {})) }));
     /* waarschuwing voor al geplande locatiewissels */
     Object.keys(docentDagLoc).forEach(d => Object.keys(docentDagLoc[d]).forEach(dg => {
       const s = docentDagLoc[d][dg]; if (s.size > 1) waarschuwingen.push({ bron: 'Planning, docent ' + d, melding: 'Op ' + dg + ' ingepland op ' + s.size + ' locaties: ' + Array.from(s).join(', ') + '.', herstel: 'Verplaats bij voorkeur een van deze assessments naar een andere dag.' });
