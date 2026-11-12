@@ -5,7 +5,7 @@
   const $ = s => document.querySelector(s);
   const inhoud = $('#inhoud');
   let m = M.laadLokaal() || M.leegModel();
-  const ui = { tab: 'assessments', soort: 'docent', inplannen: null, optie: 0, matrixSel: null };
+  const ui = { tab: 'assessments', soort: 'docent', inplannen: null, optie: 0, matrixSel: null, beschZoek: { docent: '', klas: '' } };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const tv = id => m.tijdvakken.find(t => t.id === id) || { id, label: id, uren: 0 };
@@ -173,8 +173,9 @@
         const vol = door && door.uren >= t.uren;
         return '<td' + cls + '><button class="vak' + (door ? (vol ? ' bezet' : ' deels') : '') + '" data-vak="' + t.id + '" data-naam="' + esc(res.naam) + '" aria-pressed="' + aan + '" aria-label="' + esc(res.naam + ' ' + t.label + (aan ? ' beschikbaar' : ' niet beschikbaar') + (door ? ', ' + R.fmt(door.uren) + ' uur gepland: ' + door.ids.join(', ') : '')) + '" title="' + (door ? esc(R.fmt(door.uren) + ' van ' + R.fmt(t.uren) + ' uur gepland: ' + door.ids.join(', ')) : '') + '">' + (door ? R.fmt(door.uren) + 'u' : '✓') + '</button></td>';
       }).join('');
-      const b = graad[res.naam], aantal = M.gebruikt(m, soort, res.naam).length;
-      return '<tr><td class="naam"><label class="verborgen" for="rn-' + esc(res.naam) + '">Naam</label><input id="rn-' + esc(res.naam) + '" data-hernoem="' + esc(res.naam) + '" value="' + esc(res.naam) + '"></td>' + cellen +
+      const b = graad[res.naam], gekoppeld = m.assessments.filter(a => soort === 'docent' ? a.docenten.includes(res.naam) : a.klas === res.naam), aantal = gekoppeld.length;
+      const zoek = [res.naam].concat(gekoppeld.map(a => a.id + ' ' + a.module + ' ' + (soort === 'docent' ? a.klas : a.docenten.join(' ')))).join(' | ').toLowerCase();
+      return '<tr data-zoek="' + esc(zoek) + '" data-res="' + esc(res.naam.toLowerCase()) + '"><td class="naam"><label class="verborgen" for="rn-' + esc(res.naam) + '">Naam</label><input id="rn-' + esc(res.naam) + '" data-hernoem="' + esc(res.naam) + '" value="' + esc(res.naam) + '"></td>' + cellen +
         '<td class="klein" style="white-space:nowrap;padding:0 8px">' + (b ? R.fmt(b.beschikbaar) + ' u vrij · ' + aantal + ' ass. · ' + R.fmtGraad(b.graad) : '') + '</td>' +
         '<td style="white-space:nowrap"><button class="knop klein-k" data-rij="' + esc(res.naam) + '" data-aan="1" title="Alles beschikbaar">alles</button> <button class="knop klein-k" data-rij="' + esc(res.naam) + '" data-aan="0" title="Niets beschikbaar">niets</button> ' +
         '<button class="knop klein-k gevaar" data-weg-res="' + esc(res.naam) + '" aria-label="' + esc(res.naam) + ' verwijderen"' + (aantal ? ' disabled title="Nog gekoppeld aan ' + aantal + ' assessment(s)"' : '') + '>✕</button></td></tr>';
@@ -188,9 +189,31 @@
       '<div class="rij"><button class="knop primair" id="plak-b-knop">Toevoegen of bijwerken</button></div></div>' +
       '<div class="paneel"><p class="klein">Nieuwe docenten en klassen zijn standaard <b>volledig beschikbaar</b>; zet uit wat niet kan. Snel aanpassen: klik een <b>tijdvak bovenaan</b> om dat tijdvak voor iedereen aan of uit te zetten, gebruik <b>alles / niets</b> per regel, of de knoppen bovenaan voor de hele lijst.</p><p class="klein">Klik een vakje om beschikbaarheid aan of uit te zetten. Een getal in een vakje (bijv. 2u) is het aantal uren dat daar al gepland is; gearceerd = helemaal vol. Wijs met de muis voor de assessments. Tijdvakken pas je aan op het tabblad Tijdvakken.</p></div></section>' +
       '<section class="paneel breed"><div class="rij tussen"><div><h2>Beschikbaarheid ' + wie + '</h2><span class="klein">' + lijst.length + ' ' + wie + '</span></div>' +
-      '<div class="rij"><button class="knop" data-alles="1">Iedereen alles beschikbaar</button><button class="knop" data-alles="0">Iedereen niets</button><label class="verborgen" for="nieuwe-res">Nieuwe naam</label><input id="nieuwe-res" placeholder="Nieuwe ' + (soort === 'docent' ? 'docent' : 'klas/groep') + '"><button class="knop" id="voeg-res">Toevoegen</button></div></div>' +
-      '<div class="tabelkader" style="max-height:calc(100vh - 280px);overflow:auto"><table class="rooster"><thead><tr><th class="naam">' + (soort === 'docent' ? 'Docent' : 'Klas/groep') + '</th>' + kop + '<th>Vrij · bezetting</th><th></th></tr></thead><tbody>' +
-      (rijen || '<tr><td class="naam klein" colspan="' + (m.tijdvakken.length + 3) + '">Nog geen ' + wie + '. Ze verschijnen automatisch zodra je assessments toevoegt, of plak ze hiernaast.</td></tr>') + '</tbody></table></div></section>';
+      '<div class="rij"><label class="rij klein">Filter <input id="besch-zoek" type="search" value="' + esc(ui.beschZoek[soort]) + '" placeholder="' + (soort === 'docent' ? 'naam, klas, module of ID' : 'naam, docent, module of ID') + '" style="width:220px" title="Meerdere tegelijk: scheid met een komma, bijv. Visser, Bakker"></label><button class="knop" data-alles="1">Iedereen alles beschikbaar</button><button class="knop" data-alles="0">Iedereen niets</button><label class="verborgen" for="nieuwe-res">Nieuwe naam</label><input id="nieuwe-res" placeholder="Nieuwe ' + (soort === 'docent' ? 'docent' : 'klas/groep') + '"><button class="knop" id="voeg-res">Toevoegen</button></div></div>' +
+      '<div class="tabelkader" style="max-height:calc(100vh - 280px);overflow:auto"><table class="rooster"><thead><tr><th class="naam">' + (soort === 'docent' ? 'Docent' : 'Klas/groep') + '</th>' + kop + '<th>Vrij · bezetting</th><th></th></tr></thead><tbody id="besch-rijen">' +
+      (rijen || '<tr><td class="naam klein" colspan="' + (m.tijdvakken.length + 3) + '">Nog geen ' + wie + '. Ze verschijnen automatisch zodra je assessments toevoegt, of plak ze hiernaast.</td></tr>') + '</tbody>' +
+      (lijst.length ? '<tfoot><tr class="samen-beschikbaar"><th class="naam" id="samen-label">Samen vrij</th>' + m.tijdvakken.map(t => '<th data-samen="' + t.id + '"></th>').join('') + '<th colspan="2" class="klein" style="text-align:left;font-weight:400" id="samen-uitleg"></th></tr></tfoot>' : '') +
+      '</table></div></section>';
+    beschFilter();
+  }
+  /* Filter op naam, of op wat aan een docent/klas gekoppeld is (klas, docent, module, ID). Meerdere termen met komma's:
+     een regel blijft staan als één van de termen past. De onderste rij telt per tijdvak hoeveel van de zichtbare
+     regels vrij zijn (beschikbaar en niet helemaal vol gepland); groen = allemaal. */
+  function beschFilter() {
+    const q = (ui.beschZoek[ui.soort] || '').toLowerCase().split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const rijen = [...document.querySelectorAll('#besch-rijen tr[data-zoek]')];
+    let zicht = 0;
+    rijen.forEach(tr => { const toon = !q.length || q.some(x => tr.dataset.zoek.includes(x)); tr.style.display = toon ? '' : 'none'; if (toon) zicht++; });
+    const zichtbaar = rijen.filter(tr => tr.style.display !== 'none');
+    document.querySelectorAll('[data-samen]').forEach(th => {
+      const tid = th.dataset.samen, n = zichtbaar.filter(tr => { const b = tr.querySelector('[data-vak="' + tid + '"]'); return b && b.getAttribute('aria-pressed') === 'true' && !b.classList.contains('bezet'); }).length;
+      th.textContent = zichtbaar.length ? (n === zichtbaar.length ? '✓' : n + '/' + zichtbaar.length) : '';
+      th.className = !zichtbaar.length ? '' : n === zichtbaar.length ? 'allemaal' : n === 0 ? 'niemand' : 'sommigen';
+      th.title = n + ' van ' + zichtbaar.length + ' zichtbare regels vrij in ' + tv(th.dataset.samen).label;
+    });
+    const lab = $('#samen-label'), uit = $('#samen-uitleg');
+    if (lab) lab.textContent = 'Samen vrij (' + zicht + (q.length ? ' gefilterd' : '') + ')';
+    if (uit) uit.textContent = q.length ? '✓ = alle gefilterde regels vrij' : 'Filter om overlap te zien';
   }
 
   /* ================= TIJDVAKKEN ================= */
@@ -223,6 +246,31 @@
   /* Overzicht per lesuur bij het inplannen: per docent, de klas en de lokalen op de locatie wat beschikbaar (wit),
      niet beschikbaar (grijs) en al gepland (geel) is, plus waar docent(en) en klas samen vrij zijn.
      Binnen een dagdeel liggen de lesuren van geplande assessments niet vast; ze staan vooraan getekend. */
+  /* Wie houdt een dagdeel tegen? Per docent en klas: niet beschikbaar, of te weinig uren over door wat al gepland is. */
+  function blokkades(r, it, t, nodig) {
+    const uit = [];
+    const kijk = (soort, naam) => {
+      const res = M.vindRes(m, soort, naam), wat = soort === 'docent' ? 'docent ' : 'klas ';
+      const gepl = r.gepland.filter(g => soort === 'docent' ? g.docenten.includes(naam) : g.klas === naam).map(g => ({ id: g.id, uren: g.segmenten.filter(s => s.tv === t.id).reduce((x, s) => x + s.uren, 0) })).filter(x => x.uren > 0);
+      const gebruikt = gepl.reduce((x, g) => x + g.uren, 0);
+      if (!res || !res.beschikbaar.includes(t.id)) uit.push({ naam, soort, kort: naam + ' niet beschikbaar', actie: 'maak ' + wat + naam + ' beschikbaar' });
+      else if (t.uren - gebruikt < nodig) uit.push({ naam, soort, kort: naam + ' vol (' + gepl.map(g => g.id).join(', ') + ')', actie: 'verplaats ' + gepl.map(g => g.id).join(', ') + ' van ' + wat + naam });
+    };
+    it.docenten.forEach(d => kijk('docent', d)); kijk('klas', it.klas);
+    return uit;
+  }
+  /* Suggesties als een assessment niet past: dagdelen (of dagen, bij doorlopen) waar één aanpassing genoeg is. */
+  function suggesties(r, it) {
+    const TV = m.tijdvakken, uit = [];
+    const twee = [];
+    TV.forEach(t => { if (it.uren > t.uren) return; const b = blokkades(r, it, t, it.uren); if (b.length === 1) uit.push('<b>' + esc(t.label) + '</b>: alleen ' + esc(b[0].kort) + ' → ' + esc(b[0].actie)); else if (b.length === 2) twee.push('<b>' + esc(t.label) + '</b>: ' + esc(b.map(x => x.kort).join(' en '))); });
+    uit.push.apply(uit, twee);
+    if (!uit.length) {
+      const dagen = {}; TV.forEach(t => { (dagen[dagVan(t)] = dagen[dagVan(t)] || []).push(t); });
+      Object.keys(dagen).forEach(d => { const ts = dagen[d]; if (ts.reduce((x, t) => x + t.uren, 0) < it.uren) return; const b = []; ts.forEach(t => blokkades(r, it, t, t.uren).forEach(x => { if (!b.some(y => y.kort === x.kort)) b.push(x); })); if (b.length && b.length <= 2) uit.push('<b>' + esc(d) + '</b> (hele dag, doorlopend): ' + esc(b.map(x => x.kort).join(' en '))); });
+    }
+    return uit;
+  }
   function planRaster(r, it) {
     const TV = m.tijdvakken, loc = it.locatie, o = it.opties[ui.optie || 0];
     const dagen = []; TV.forEach(t => { const d = dagVan(t); if (!dagen.length || dagen[dagen.length - 1].dag !== d) dagen.push({ dag: d, n: 0 }); dagen[dagen.length - 1].n += t.uren; });
@@ -245,9 +293,10 @@
     /* samen vrij + gekozen optie */
     h += '<tr class="samenrij"><th class="rnaam">Samen vrij</th>' + TV.map(t => {
       const c = it.capPerTv[t.id], wissel = c < 0, vrij = Math.abs(c), seg = o && o.segmenten.find(s => s.tv === t.id), kies = it.opties.findIndex(x => x.segmenten.some(s => s.tv === t.id));
-      const cls = (seg ? 'gekozen' : vrij > 0 ? (wissel ? 'samen-wissel' : 'samen') : 'grijs') + ' dd-grens' + (kies >= 0 ? ' kiesbaar' : '');
-      const tekst = seg ? '<b>' + it.id + '</b> ' + R.fmt(seg.uren) + 'u' + (seg.extra ? ' · +lokaal' : '') : vrij > 0 ? R.fmt(vrij) + 'u' + (wissel ? ' ⚠' : '') : '';
-      return '<td colspan="' + t.uren + '" class="' + cls + '"' + (kies >= 0 ? ' data-kies="' + kies + '"' : '') + ' title="' + esc(t.label + ': ' + (vrij > 0 ? R.fmt(vrij) + ' uur samen vrij' + (wissel ? ', maar een docent is die dag op een andere locatie' : '') : 'niet samen vrij') + (kies >= 0 ? ' · klik om hier in te plannen' : '')) + '"><div class="rblok">' + tekst + '</div></td>';
+      const cls = (seg ? 'gekozen' : vrij > 0 ? (wissel ? 'samen-wissel' : kies < 0 ? 'samen-deels' : 'samen') : 'grijs') + ' dd-grens' + (kies >= 0 ? ' kiesbaar' : '');
+      const blok = vrij > 0 ? [] : blokkades(r, it, t, 1);
+      const tekst = seg ? '<b>' + it.id + '</b> ' + R.fmt(seg.uren) + 'u' + (seg.extra ? ' · +lokaal' : '') : vrij > 0 ? R.fmt(vrij) + 'u' + (wissel ? ' ⚠' : '') : '<span class="blokker">' + esc(blok.map(b => b.naam).join(', ')) + '</span>';
+      return '<td colspan="' + t.uren + '" class="' + cls + '"' + (kies >= 0 ? ' data-kies="' + kies + '"' : '') + ' title="' + esc(t.label + ': ' + (vrij > 0 ? R.fmt(vrij) + ' uur samen vrij' + (kies < 0 && vrij < it.uren ? ' (te weinig voor ' + R.fmt(it.uren) + ' uur)' : '') + (wissel ? ', maar een docent is die dag op een andere locatie' : '') : 'niet samen vrij: ' + blok.map(b => b.kort).join('; ')) + (kies >= 0 ? ' · klik om hier in te plannen' : '')) + '"><div class="rblok">' + tekst + '</div></td>';
     }).join('') + '</tr>';
     /* lokalen op de locatie */
     if (loc) {
@@ -275,8 +324,15 @@
       h += '<tr><td class="num">' + it.volgnummer + '</td><td class="mono"><b>' + it.id + '</b></td><td>' + esc(it.module) + '</td><td>' + esc(it.klas) + '</td><td class="klein">' + esc(it.locatie || '—') + '</td><td>' + esc(it.docenten.join('; ')) + '</td>' +
         '<td class="num">' + R.fmt(it.uren) + '</td><td class="num' + (it.past ? '' : ' pastniet') + '">' + R.fmt(it.overlap) + '</td><td style="white-space:nowrap">' + krapCel(it) + '</td>' +
         '<td class="klein">' + esc(it.knelpunt) + '</td><td class="klein">' + (it.volgtUit ? '<span class="mono">' + it.volgtUit.id + '</span> via ' + esc(it.volgtUit.via.naam) : '—') + '</td>' +
-        '<td class="rechts">' + (it.alleenMetExtraLokaal ? '<span class="waarsch" title="Past alleen met een extra lokaal">+lokaal</span> ' : '') + (it.alleenMetWissel ? '<span class="waarsch" title="Past alleen met een locatiewissel van een docent">⚠</span> ' : '') + '<button class="knop klein-k" data-inplan="' + it.id + '"' + (it.past ? '' : ' disabled') + '>Inplannen</button></td></tr>';
-      if (ui.inplannen === it.id) {
+        '<td class="rechts">' + (it.alleenMetExtraLokaal ? '<span class="waarsch" title="Past alleen met een extra lokaal">+lokaal</span> ' : '') + (it.alleenMetWissel ? '<span class="waarsch" title="Past alleen met een locatiewissel van een docent">⚠</span> ' : '') + '<button class="knop klein-k" data-inplan="' + it.id + '"' + (it.past ? '' : ' title="Past nu niet. Klik om het rooster te zien en te bekijken waar je de beschikbaarheid kunt vergroten."') + '>' + (it.past ? 'Inplannen' : 'Bekijken') + '</button></td></tr>';
+      if (ui.inplannen === it.id && !it.past) {
+        const sg = suggesties(r, it);
+        h += '<tr class="inplanrij"><td></td><td colspan="11"><div class="kolom" style="gap:8px;padding:6px 0">' +
+          '<div class="melding fout" style="margin:0"><div><strong>' + it.id + ' (' + R.fmt(it.uren) + ' uur) past nu niet.</strong> Docent(en) en klas zijn nergens ' + R.fmt(it.uren) + ' uur samen vrij' + (it.uren > Math.max.apply(null, m.tijdvakken.map(t => t.uren)) ? ' (in één dagdeel of doorlopend op één dag)' : ' in één dagdeel') + '. In de rij <b>Samen vrij</b> staat per dagdeel wie het tegenhoudt; wijs een vak aan voor de details.' +
+          (sg.length ? '<br>Hier is weinig voor nodig:<ul>' + sg.slice(0, 8).map(x => '<li>' + x + '</li>').join('') + '</ul>' : '<br>Er is geen dagdeel waar één of twee aanpassingen genoeg zijn; kijk welke beschikbaarheid het makkelijkst te vergroten is, of verdeel het assessment.') +
+          ' Pas de beschikbaarheid aan op het tabblad <b>Beschikbaarheid</b>, of zet een gepland assessment terug.</div></div>' +
+          planRaster(r, it) + '<div class="rij"><button class="knop" data-annuleer>Sluiten</button></div></div></td></tr>';
+      } else if (ui.inplannen === it.id) {
         h += '<tr class="inplanrij"><td></td><td colspan="11"><div class="kolom" style="gap:8px;padding:6px 0">' +
           '<span class="klein">Kies waar <b>' + it.id + '</b> (' + R.fmt(it.uren) + ' uur, ' + esc(it.locatie) + ') wordt ingepast: klik in de rij <b>Samen vrij</b> of kies een optie. Beste opties bovenaan: zonder locatiewissel, met een vrij lokaal, in één dagdeel. Doorlopend = eind ochtend + begin middag. Geen lokaal vrij is geen beletsel: je krijgt dan de melding dat je daar een lokaal extra nodig hebt.</span>' + planRaster(r, it) + '<div class="opties">' +
           it.opties.map((o, k) => '<label class="optie' + (o.waarschuwing || o.extraLokaal ? ' let' : '') + '"><input type="radio" name="optie" data-optie="' + k + '"' + (ui.optie === k ? ' checked' : '') + '><span>' + esc(segTekst(o.segmenten)) + (o.span ? ' <span class="label-info" style="padding:1px 6px">doorlopend</span>' : '') + (o.waarschuwing ? '<br><span class="waarsch">⚠ ' + esc(o.waarschuwing) + '</span>' : '') + (o.extraLokaal ? '<br><span class="waarsch">Geen lokaal vrij op ' + esc(it.locatie) + ': hier is een lokaal extra nodig.</span>' : '') + '</span></label>').join('') + '</div>' +
@@ -602,6 +658,7 @@
     if (t.id === 'drempel') { const v = Math.max(0, Math.min(100, parseFloat(t.value) || 0)) / 100; m.instellingen.drempel = v; m.invoerversie++; na(); renderVolgorde(); }
   });
   inhoud.addEventListener('input', e => {
+    if (e.target.id === 'besch-zoek') { ui.beschZoek[ui.soort] = e.target.value; beschFilter(); return; }
     if (e.target.id === 'zoek') { const q = e.target.value.trim().toLowerCase(); document.querySelectorAll('#ass-rijen tr').forEach(tr => { tr.style.display = !q || (tr.dataset.zoek || '').includes(q) ? '' : 'none'; }); }
   });
   inhoud.addEventListener('keydown', e => {

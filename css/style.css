@@ -172,6 +172,12 @@ table.dsm.met-blok tbody th.naamcel { max-width: 420px; }
 table.rooster { border-collapse: separate; border-spacing: 0; font-size: 12px; }
 table.rooster th { position: sticky; top: 0; background: #FFFFFF; z-index: 1; font-weight: 600; color: var(--tekst-3); padding: 6px 4px; border-bottom: 1px solid #C9C9C4; text-align: center; white-space: nowrap; }
 table.rooster th.naam, table.rooster td.naam { position: sticky; left: 0; background: #FFFFFF; z-index: 2; text-align: left; min-width: 180px; padding: 2px 8px; border-right: 1px solid #C9C9C4; }
+table.rooster thead th.naam { z-index: 4; top: 0; }
+table.rooster tfoot th { position: sticky; bottom: 0; top: auto; z-index: 3; background: #F6F9FE; border-top: 2px solid #9DBCE6; border-bottom: 0; padding: 6px 4px; color: var(--tekst-1, #1F2328); }
+table.rooster tfoot th.naam { z-index: 5; }
+table.rooster tfoot th.allemaal { background: #C0DD97; color: #173404; }
+table.rooster tfoot th.sommigen { background: #FAEEDA; color: #633806; }
+table.rooster tfoot th.niemand { background: #E6E6E2; color: #5F5E5A; }
 table.rooster td { border-bottom: 1px solid #EFEFEA; padding: 2px; text-align: center; }
 table.rooster td.naam input { width: 100%; border: 1px solid transparent; background: transparent; padding: 5px 6px; border-radius: 5px; }
 table.rooster td.naam input:hover, table.rooster td.naam input:focus { border-color: #C9C9C4; background: #FFFFFF; outline: none; }
@@ -283,3 +289,5 @@ table.raster .rblok { overflow: hidden; white-space: nowrap; text-overflow: elli
 table.raster tr.samenrij th, table.raster tr.samenrij td { border-top: 2px solid #9DBCE6; border-bottom: 2px solid #9DBCE6; }
 table.raster tr.lokaalrij.eerste th, table.raster tr.lokaalrij.eerste td { border-top: 6px solid #F4F4F2; }
 table.raster tr.lokaalrij th.rnaam { color: #5F5E5A; }
+table.raster .blokker { color: #5F5E5A; font-size: 9px; }
+table.raster td.samen-deels { background: #EAF3DE; color: #3B6D11; }
