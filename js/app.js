@@ -5,7 +5,10 @@
   const $ = s => document.querySelector(s);
   const inhoud = $('#inhoud');
   let m = M.laadLokaal() || M.leegModel();
-  const ui = { tab: 'assessments', soort: 'docent', inplannen: null, optie: 0, matrixSel: null, beschZoek: { docent: '', klas: '' } };
+  const ui = { tab: 'assessments', soort: 'docent', inplannen: null, optie: 0, matrixSel: null, beschZoek: { docent: '', klas: '' }, matrixModus: 'open',
+    afdruk: { resultaat: true, volgorde: true, matrix: true, bezInvoer: true, bezNa: true, lokalen: true, lokaalBezetting: true, indeling: true, beschDoc: true, beschKlas: true, interventies: true } };
+  /* Matrix: 'open' = tussen nog te plannen assessments (met de ruimte die over is); 'alle' = alle assessments, vanaf het begin (alsof niets gepland is). */
+  const matrixAnalyse = () => ui.matrixModus === 'alle' ? R.analyseerZonderPlanning(m) : analyse();
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const tv = id => m.tijdvakken.find(t => t.id === id) || { id, label: id, uren: 0 };
@@ -57,13 +60,13 @@
     renderKop();
     document.querySelectorAll('.tabs button').forEach(b => { if (b.dataset.tab === ui.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     inhoud.classList.toggle('volle-breedte', ui.tab === 'matrix' || ui.tab === 'export' || ui.tab === 'lokalen');
-    ({ assessments: renderAssessments, beschikbaarheid: renderBeschikbaarheid, locaties: renderLocaties, tijdvakken: renderTijdvakken, volgorde: renderVolgorde, matrix: renderMatrix, bezetting: renderBezetting, lokalen: renderLokalen, export: renderExport })[ui.tab]();
+    ({ assessments: renderAssessments, beschikbaarheid: renderBeschikbaarheid, locaties: renderLocaties, tijdvakken: renderTijdvakken, volgorde: renderVolgorde, matrix: renderMatrix, bezetting: renderBezetting, lokalen: renderLokalen, interventies: renderInterventies, export: renderExport })[ui.tab]();
   }
   document.querySelector('.tabbalk').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { ui.tab = b.dataset.tab; wisMeldingen(); render(); window.scrollTo(0, 0); } });
   $('#modelnaam').addEventListener('change', e => { m.naam = e.target.value.trim() || 'Naamloze planning'; m.invoerversie++; na(); });
 
   const heeftInhoud = () => m.assessments.length || m.docenten.length || m.klassen.length;
-  function laad(nieuw, tekst) { m = nieuw; ui.inplannen = null; ui.matrixSel = null; bewaar(); ui.tab = 'assessments'; render(); if (tekst) toonOk(tekst); }
+  function laad(nieuw, tekst) { m = nieuw; ui.inplannen = null; ui.matrixSel = null; ui.ivForm = null; ui.ivBewerk = null; bewaar(); ui.tab = 'assessments'; render(); if (tekst) toonOk(tekst); }
   function download(naam, inhoudData, type) {
     const blob = new Blob([inhoudData], { type }), a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = naam; document.body.appendChild(a); a.click(); a.remove();
@@ -295,10 +298,10 @@
     /* samen vrij + gekozen optie */
     h += '<tr class="samenrij"><th class="rnaam">Samen vrij</th>' + TV.map(t => {
       const c = it.capPerTv[t.id], wissel = c < 0, vrij = Math.abs(c), seg = o && o.segmenten.find(s => s.tv === t.id), kies = it.opties.findIndex(x => x.segmenten.some(s => s.tv === t.id));
-      const cls = (seg ? 'gekozen' : vrij > 0 ? (wissel ? 'samen-wissel' : kies < 0 ? 'samen-deels' : 'samen') : 'grijs') + ' dd-grens' + (kies >= 0 ? ' kiesbaar' : '');
+      const cls = (seg ? 'gekozen' : vrij > 0 ? (wissel ? 'samen-wissel' : kies < 0 ? 'samen-deels' : it.klasDagTv[t.id] ? 'samen-dag' : 'samen') : 'grijs') + ' dd-grens' + (kies >= 0 ? ' kiesbaar' : '');
       const blok = vrij > 0 ? [] : blokkades(r, it, t, 1);
       const tekst = seg ? '<b>' + it.id + '</b> ' + R.fmt(seg.uren) + 'u' + (seg.extra ? ' · +lokaal' : '') : vrij > 0 ? R.fmt(vrij) + 'u' + (wissel ? ' ⚠' : '') : '<span class="blokker">' + esc(blok.map(b => b.naam).join(', ')) + '</span>';
-      return '<td colspan="' + t.uren + '" class="' + cls + '"' + (kies >= 0 ? ' data-kies="' + kies + '"' : '') + ' title="' + esc(t.label + ': ' + (vrij > 0 ? R.fmt(vrij) + ' uur samen vrij' + (kies < 0 && vrij < it.uren ? ' (te weinig voor ' + R.fmt(it.uren) + ' uur)' : '') + (wissel ? ', maar een docent is die dag op een andere locatie' : '') : 'niet samen vrij: ' + blok.map(b => b.kort).join('; ')) + (kies >= 0 ? ' · klik om hier in te plannen' : '')) + '"><div class="rblok">' + tekst + '</div></td>';
+      return '<td colspan="' + t.uren + '" class="' + cls + '"' + (kies >= 0 ? ' data-kies="' + kies + '"' : '') + ' title="' + esc(t.label + ': ' + (vrij > 0 ? R.fmt(vrij) + ' uur samen vrij' + (kies < 0 && vrij < it.uren ? ' (te weinig voor ' + R.fmt(it.uren) + ' uur)' : '') + (wissel ? ', maar een docent is die dag op een andere locatie' : '') + (it.klasDagTv[t.id] ? ', maar ' + it.klas + ' heeft die dag al een assessment' : '') : 'niet samen vrij: ' + blok.map(b => b.kort).join('; ')) + (kies >= 0 ? ' · klik om hier in te plannen' : '')) + '"><div class="rblok">' + tekst + '</div></td>';
     }).join('') + '</tr>';
     /* lokalen op de locatie */
     if (loc) {
@@ -311,7 +314,7 @@
         }).replace('<tr>', '<tr class="lokaalrij' + (i === 1 ? ' eerste' : '') + '">');
       }
     }
-    return '<div class="rasterkader">' + h + '</tbody></table></div><div class="legenda klein"><span><span class="chip" style="background:#FFFFFF;border:1px solid #9DBCE6"></span>beschikbaar</span><span><span class="chip" style="background:#DEDEDE"></span>niet beschikbaar / geen lokaal</span><span><span class="chip" style="background:#FFF59A;border:1px solid #1F2328"></span>al gepland (binnen het dagdeel vooraan getekend)</span><span><span class="chip" style="background:#E24B4A"></span>docent die dag al op een andere locatie</span><span><span class="chip" style="background:#C0DD97"></span>docent(en) en klas samen vrij</span><span><span class="chip" style="background:#FAC775"></span>samen vrij, maar met locatiewissel</span><span><span class="chip" style="background:#378ADD"></span>gekozen optie</span><span><span class="chip" style="background:#F7C1C1"></span>extra lokaal nodig</span></div>';
+    return '<div class="rasterkader">' + h + '</tbody></table></div><div class="legenda klein"><span><span class="chip" style="background:#FFFFFF;border:1px solid #9DBCE6"></span>beschikbaar</span><span><span class="chip" style="background:#DEDEDE"></span>niet beschikbaar / geen lokaal</span><span><span class="chip" style="background:#FFF59A;border:1px solid #1F2328"></span>al gepland (binnen het dagdeel vooraan getekend)</span><span><span class="chip" style="background:#E24B4A"></span>docent die dag al op een andere locatie</span><span><span class="chip" style="background:#C0DD97"></span>docent(en) en klas samen vrij</span><span><span class="chip" style="background:#FAC775"></span>samen vrij, maar met locatiewissel</span><span><span class="chip" style="background:#CECBF6"></span>samen vrij, maar de klas heeft die dag al een assessment</span><span><span class="chip" style="background:#378ADD"></span>gekozen optie</span><span><span class="chip" style="background:#F7C1C1"></span>extra lokaal nodig</span></div>';
   }
   function renderVolgorde() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe op het tabblad <b>Assessments</b>.</section>'; return; }
@@ -336,8 +339,8 @@
           planRaster(r, it) + '<div class="rij"><button class="knop" data-annuleer>Sluiten</button></div></div></td></tr>';
       } else if (ui.inplannen === it.id) {
         h += '<tr class="inplanrij"><td></td><td colspan="11"><div class="kolom" style="gap:8px;padding:6px 0">' +
-          '<span class="klein">Kies waar <b>' + it.id + '</b> (' + R.fmt(it.uren) + ' uur, ' + esc(it.locatie) + ') wordt ingepast: klik in de rij <b>Samen vrij</b> of kies een optie. Beste opties bovenaan: zonder locatiewissel, met een vrij lokaal, in één dagdeel. Doorlopend = eind ochtend + begin middag. Geen lokaal vrij is geen beletsel: je krijgt dan de melding dat je daar een lokaal extra nodig hebt.</span>' + planRaster(r, it) + '<div class="opties">' +
-          it.opties.map((o, k) => '<label class="optie' + (o.waarschuwing || o.extraLokaal ? ' let' : '') + '"><input type="radio" name="optie" data-optie="' + k + '"' + (ui.optie === k ? ' checked' : '') + '><span>' + esc(segTekst(o.segmenten)) + (o.span ? ' <span class="label-info" style="padding:1px 6px">doorlopend</span>' : '') + (o.waarschuwing ? '<br><span class="waarsch">⚠ ' + esc(o.waarschuwing) + '</span>' : '') + (o.extraLokaal ? '<br><span class="waarsch">Geen lokaal vrij op ' + esc(it.locatie) + ': hier is een lokaal extra nodig.</span>' : '') + '</span></label>').join('') + '</div>' +
+          '<span class="klein">Kies waar <b>' + it.id + '</b> (' + R.fmt(it.uren) + ' uur, ' + esc(it.locatie) + ') wordt ingepast: klik in de rij <b>Samen vrij</b> of kies een optie. Beste opties bovenaan: zonder locatiewissel, niet op een dag waarop de klas al een assessment heeft (paars), met een vrij lokaal, in één dagdeel. Doorlopend = eind ochtend + begin middag. Geen lokaal vrij is geen beletsel: je krijgt dan de melding dat je daar een lokaal extra nodig hebt.</span>' + planRaster(r, it) + '<div class="opties">' +
+          it.opties.map((o, k) => '<label class="optie' + (o.waarschuwing || o.extraLokaal ? ' let' : o.zelfdeDag ? ' zelfdedag' : '') + '"><input type="radio" name="optie" data-optie="' + k + '"' + (ui.optie === k ? ' checked' : '') + '><span>' + esc(segTekst(o.segmenten)) + (o.span ? ' <span class="label-info" style="padding:1px 6px">doorlopend</span>' : '') + (o.waarschuwing ? '<br><span class="waarsch">⚠ ' + esc(o.waarschuwing) + '</span>' : '') + (o.zelfdeDag ? '<br><span class="zelfdedag-tekst">' + esc(o.zelfdeDag) + ' (liever niet twee op één dag)</span>' : '') + (o.extraLokaal ? '<br><span class="waarsch">Geen lokaal vrij op ' + esc(it.locatie) + ': hier is een lokaal extra nodig.</span>' : '') + '</span></label>').join('') + '</div>' +
           '<div class="rij"><button class="knop primair" data-bevestig="' + it.id + '">Inplannen bevestigen</button><button class="knop" data-annuleer>Annuleren</button></div></div></td></tr>';
       }
     });
@@ -358,13 +361,13 @@
   /* Letters voor wat gedeeld wordt boven de drempel: D docent, K klas, L locatie (lokalen). */
   function letter(k, drempel) { const s = k.gedeeld.filter(g => g.graad > drempel).map(g => g.soort); return (s.includes('docent') ? 'D' : '') + (s.includes('klas') ? 'K' : '') + (s.includes('locatie') ? 'L' : ''); }
   const resNaam = g => (g.soort === 'docent' ? 'docent ' : g.soort === 'klas' ? 'klas ' : 'locatie ') + g.naam;
-  function matrixHtml(r, klikbaar) {
-    const o = r.volgorde;
+  function matrixHtml(r, klikbaar, alle) {
+    const o = r.volgorde, geplandId = {}; if (alle) m.assessments.forEach(a => { if (a.gepland.length) geplandId[a.id] = a.gepland.map(s => tv(s.tv).label).join('+'); });
     let h = '<table class="dsm met-blok"><thead><tr><th class="blokkop">Eiland</th><th class="hoek">assessment</th>' + o.map(x => '<th scope="col" title="' + esc(x.id + ' ' + x.module + ' · ' + x.klas) + '">' + x.id + '</th>').join('') + '</tr></thead><tbody>';
     let vorig = null;
     o.forEach((x, i) => {
       const grens = vorig !== null && x.eiland !== vorig; vorig = x.eiland;
-      h += '<tr' + (grens ? ' class="eilandgrens"' : '') + '><th class="blokcel">' + (x.eiland === 'los' ? 'los' : x.eiland) + '</th><th scope="row" class="naamcel" title="' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '"><span class="id">' + x.id + '</span>' + esc(x.module) + ' · <b>' + esc(x.klas) + '</b> <span class="docentnamen">· ' + esc(x.docenten.join('; ')) + '</span></th>';
+      h += '<tr' + (grens ? ' class="eilandgrens"' : '') + '><th class="blokcel">' + (x.eiland === 'los' ? 'los' : x.eiland) + '</th><th scope="row" class="naamcel" title="' + esc(x.module + ' · ' + x.klas + ' · ' + x.docenten.join('; ')) + '"><span class="id">' + x.id + '</span>' + (geplandId[x.id] ? '<span class="gepland-merk" title="Ingepland: ' + esc(geplandId[x.id]) + '">✓ ' + esc(geplandId[x.id]) + '</span> ' : '') + esc(x.module) + ' · <b>' + esc(x.klas) + '</b> <span class="docentnamen">· ' + esc(x.docenten.join('; ')) + '</span></th>';
       o.forEach((y, j) => {
         if (i === j) { h += '<td class="diag"></td>'; return; }
         const k = r.kop(x.id, y.id);
@@ -382,11 +385,13 @@
   }
   function renderMatrix() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe.</section>'; return; }
-    const r = analyse();
-    inhoud.innerHTML = '<section class="paneel" style="flex:1 1 100%"><h2>Afhankelijkheden tussen nog te plannen assessments</h2>' +
+    const r = matrixAnalyse(), alle = ui.matrixModus === 'alle';
+    inhoud.innerHTML = '<section class="paneel" style="flex:1 1 100%"><div class="rij tussen"><h2>Afhankelijkheden tussen ' + (alle ? 'alle assessments (vanaf het begin)' : 'nog te plannen assessments') + '</h2>' +
+      '<div class="segment" role="group" aria-label="Welke assessments"><button data-mmodus="open" aria-pressed="' + !alle + '">Nog te plannen</button><button data-mmodus="alle" aria-pressed="' + alle + '">Alle, vanaf het begin</button></div></div>' +
+      (alle ? '<p class="klein"><b>Vanaf het begin</b>: alle assessments, gerekend alsof er nog niets gepland is. ✓ = al ingepland (met dagdeel).</p>' : '<p class="klein"><b>Nog te plannen</b>: alleen wat nog open staat, met de ruimte die na de planning over is.</p>') +
       '<p class="klein">Rijen en kolommen staan in planningsvolgorde. Een gevulde cel betekent: deze twee assessments delen een docent (D) of klas (K) en beperken dus elkaars ruimte. De kleur toont hoe druk wat ze delen is. Lokalen tellen hier niet mee: die kun je bijvragen; zie het tabblad Lokalen.</p>' + legendaMatrix(r) +
       '<div id="mpaneel" class="koppelbalk"></div>' +
-      '<div class="matrixkader" id="pm">' + matrixHtml(r, true) + '</div></section>';
+      '<div class="matrixkader" id="pm">' + (r.volgorde.length ? matrixHtml(r, true, alle) : '<p class="klein" style="padding:12px">Alles is ingepland. Kies <b>Alle, vanaf het begin</b> om de afhankelijkheden te zien.</p>') + '</div></section>';
     renderMatrixPaneel(r);
     matrixOplichten($('#pm table.dsm'));
   }
@@ -540,26 +545,164 @@
   }
 
   /* ================= EXPORT ================= */
+  /* ================= INTERVENTIES ================= */
+  const STATUSKLASSE = { 'Akkoord': 's-ok', 'In afwachting': 's-wacht', 'Niet akkoord': 's-niet', 'Vervallen': 's-verv' };
+  const datumNl = d => /^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d.slice(8, 10) + '-' + d.slice(5, 7) + '-' + d.slice(0, 4) : (d || '');
+  const vandaag = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  /* keuzes voor "Betreft": assessments, docenten en klassen uit de invoer */
+  function betreftKeuzes() {
+    const k = [];
+    m.assessments.forEach(a => k.push({ tekst: a.id + ' · ' + a.module + ' · ' + a.klas, soort: 'ass', naam: a.id }));
+    m.docenten.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl')).forEach(d => k.push({ tekst: 'Docent: ' + d.naam, soort: 'docent', naam: d.naam }));
+    m.klassen.slice().sort((a, b) => a.naam.localeCompare(b.naam, 'nl')).forEach(d => k.push({ tekst: 'Klas: ' + d.naam, soort: 'klas', naam: d.naam }));
+    return k;
+  }
+  function chipHtml(b, weg) {
+    const ass = b.soort === 'ass' ? m.assessments.find(x => x.id === b.naam) : null;
+    const tekst = b.soort === 'ass' ? b.naam + (ass ? ' ' + ass.module + ' · ' + ass.klas : '') : b.naam;
+    return '<span class="ivchip c-' + b.soort + '">' + esc(tekst) + (weg !== undefined ? ' <button class="chipweg" data-ivchipweg="' + weg + '" aria-label="' + esc(tekst) + ' weghalen">×</button>' : '') + '</span>';
+  }
+  function ivFormLeeg() { return { datum: vandaag(), betreft: [], wat: '', reden: '', overlegdMet: '', status: 'Akkoord' }; }
+  function ivGevolg(iv) {
+    return iv.betreft.filter(b => b.soort === 'ass').map(b => { const a = m.assessments.find(x => x.id === b.naam); return a && a.gepland.length ? '✓ ' + a.id + ' ingepland in ' + a.gepland.map(s => tv(s.tv).label).join('+') : ''; }).filter(Boolean).join(' · ');
+  }
+  function interventieTabel(lijst, metKnoppen) {
+    if (!lijst.length) return '<p class="klein">Nog geen interventies vastgelegd.</p>';
+    return '<div class="tabelkader"><table class="lijst ivlijst"><thead><tr><th style="width:95px">Datum</th><th style="width:260px">Betreft</th><th>Wat is aangepast</th><th style="width:200px">Overlegd met</th><th style="width:120px">Status</th>' + (metKnoppen ? '<th style="width:50px"></th>' : '') + '</tr></thead><tbody id="iv-rijen">' +
+      lijst.map(iv => {
+        const zoek = [datumNl(iv.datum), M.betreftTekst(m, iv.betreft), iv.wat, iv.reden, iv.overlegdMet, iv.status].join(' ').toLowerCase(), gevolg = ivGevolg(iv);
+        return '<tr data-zoek="' + esc(zoek) + '"' + (iv.status === 'Vervallen' ? ' class="vervallen"' : '') + '><td>' + esc(datumNl(iv.datum)) + '</td><td>' + iv.betreft.map(b => chipHtml(b)).join(' ') + '</td><td>' + esc(iv.wat) +
+          (iv.reden ? '<div class="ivreden"><b>Reden:</b> ' + esc(iv.reden) + '</div>' : '') + (gevolg ? '<div class="ivgevolg">' + esc(gevolg) + '</div>' : '') + '</td><td>' + esc(iv.overlegdMet) + '</td><td><span class="ivstatus ' + STATUSKLASSE[iv.status] + '">' + esc(iv.status) + '</span></td>' +
+          (metKnoppen ? '<td><button class="knop klein-k" data-ivbewerk="' + iv.id + '" title="Aanpassen of verwijderen" aria-label="Interventie ' + iv.id + ' aanpassen">✎</button></td>' : '') + '</tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  const ivGesorteerd = () => (m.interventies || []).slice().sort((a, b) => (b.datum || '').localeCompare(a.datum || '') || b.id.localeCompare(a.id));
+  function renderInterventies() {
+    if (!ui.ivForm) ui.ivForm = ivFormLeeg();
+    const f = ui.ivForm, bew = ui.ivBewerk, lijst = ivGesorteerd();
+    const tel = {}; M.STATUSSEN.forEach(s => { tel[s] = lijst.filter(x => x.status === s).length; });
+    inhoud.innerHTML =
+      '<section class="paneel" style="flex:1 1 100%"><h2>' + (bew ? 'Interventie ' + bew + ' aanpassen' : 'Interventie vastleggen') + '</h2>' +
+      '<p class="klein">Leg vast wat je hebt aangepast of voorgesteld om een knelpunt op te lossen. Kies bij <b>Betreft</b> een of meer assessments, docenten of klassen (typ om te zoeken, Enter of + om toe te voegen). Ook wat <b>niet akkoord</b> of <b>vervallen</b> is, is de moeite waard: dan zie je later welke opties al bekeken zijn.</p>' +
+      '<div class="ivform">' +
+      '<label>Datum overleg<input type="date" id="iv-datum" value="' + esc(f.datum) + '"></label>' +
+      '<label>Betreft (assessment, docent, klas)<div class="ivchips" id="iv-chips">' + f.betreft.map((b, i) => chipHtml(b, i)).join('') + '<span class="ivkies"><input id="iv-betreft" list="iv-keuzes" placeholder="+ toevoegen…" autocomplete="off"><button class="knop klein-k" id="iv-betreft-knop" aria-label="Toevoegen">+</button></span></div>' +
+      '<datalist id="iv-keuzes">' + betreftKeuzes().map(k => '<option value="' + esc(k.tekst) + '"></option>').join('') + '</datalist></label>' +
+      '<label>Wat is aangepast<textarea id="iv-wat" rows="2">' + esc(f.wat) + '</textarea></label>' +
+      '<label>Reden<textarea id="iv-reden" rows="2" placeholder="waarom (niet) akkoord, of waarom nodig">' + esc(f.reden) + '</textarea></label>' +
+      '<label>Overlegd met<input id="iv-overleg" value="' + esc(f.overlegdMet) + '" placeholder="namen of rollen"></label>' +
+      '<label>Status<select id="iv-status">' + M.STATUSSEN.map(s => '<option' + (f.status === s ? ' selected' : '') + '>' + s + '</option>').join('') + '</select></label>' +
+      '</div><div class="rij" style="margin-top:10px"><button class="knop primair" id="iv-opslaan">' + (bew ? 'Wijziging opslaan' : 'Toevoegen') + '</button>' +
+      (bew ? '<button class="knop" id="iv-annuleer">Annuleren</button><button class="knop gevaar" id="iv-verwijder">Verwijderen</button>' : '') +
+      '<span class="klein">Wordt bewaard in de browser en in het werkbestand (tabblad Interventies).</span></div></section>' +
+      '<section class="paneel" style="flex:1 1 100%"><div class="rij tussen"><div><h2>Interventies</h2><span class="klein">' + lijst.length + ' interventie(s) · nieuwste bovenaan' + (lijst.length ? ' · ' + M.STATUSSEN.filter(s => tel[s]).map(s => tel[s] + ' ' + s.toLowerCase()).join(', ') : '') + '</span></div>' +
+      '<label class="rij klein">Filter <input id="iv-zoek" type="search" value="' + esc(ui.ivZoek || '') + '" placeholder="module, docent, klas, persoon of status" style="width:260px"></label></div>' +
+      interventieTabel(lijst, true) + '</section>';
+    ivFilter();
+  }
+  function ivFilter() {
+    const q = (ui.ivZoek || '').trim().toLowerCase();
+    document.querySelectorAll('#iv-rijen tr').forEach(tr => { tr.style.display = !q || tr.dataset.zoek.includes(q) ? '' : 'none'; });
+  }
+  function ivLeesForm() {
+    const f = ui.ivForm; if (!f) return;
+    const v = id => { const e = document.getElementById(id); return e ? e.value : ''; };
+    f.datum = v('iv-datum'); f.wat = v('iv-wat').trim(); f.reden = v('iv-reden').trim(); f.overlegdMet = v('iv-overleg').trim(); f.status = v('iv-status') || f.status;
+  }
+  function ivVoegBetreftToe() {
+    const inp = $('#iv-betreft'); if (!inp) return;
+    const t = inp.value.trim(); if (!t) return;
+    const k = betreftKeuzes().find(x => x.tekst.toLowerCase() === t.toLowerCase()) || betreftKeuzes().find(x => x.naam.toLowerCase() === t.toLowerCase());
+    if (!k) { toonFouten([{ bron: 'Interventie, betreft', melding: '"' + t + '" staat niet in de invoer.', herstel: 'Kies een assessment, docent of klas uit de lijst die verschijnt als je typt.' }]); return; }
+    ivLeesForm();
+    if (!ui.ivForm.betreft.some(b => b.soort === k.soort && b.naam === k.naam)) ui.ivForm.betreft.push({ soort: k.soort, naam: k.naam });
+    renderInterventies(); const n = $('#iv-betreft'); if (n) n.focus();
+  }
+
+  /* Planningsresultaat: per dagdeel, locatie en lokaal wat waar staat, om over te nemen in het roosterpakket. */
+  function resultaatTabel(r) {
+    if (!r.gepland.length) return '<p class="klein">Nog niets ingepland.</p>';
+    const regels = [];
+    r.gepland.forEach(g => g.segmenten.forEach((s, i) => regels.push({ g, s, deel: g.segmenten.length > 1 ? (i + 1) + '/' + g.segmenten.length : '' })));
+    const pos = id => m.tijdvakken.findIndex(t => t.id === id);
+    regels.sort((x, y) => pos(x.s.tv) - pos(y.s.tv) || x.g.locatie.localeCompare(y.g.locatie) || x.s.lokaal - y.s.lokaal || x.g.id.localeCompare(y.g.id));
+    let vorigeDag = null;
+    return '<div class="tabelkader"><table class="lijst resultaat"><thead><tr><th>Dagdeel</th><th>Locatie</th><th>Lokaal</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Docent(en)</th><th class="num">Uren</th><th>Deel</th></tr></thead><tbody>' +
+      regels.map(x => {
+        const t = tv(x.s.tv), dg = dagVan(t), grens = vorigeDag !== null && dg !== vorigeDag; vorigeDag = dg;
+        return '<tr' + (grens ? ' class="eilandgrens"' : '') + '><td><b>' + esc(t.label) + '</b></td><td>' + esc(x.g.locatie) + '</td><td>' + (x.s.extra ? '<span class="waarsch">extra lokaal nodig</span>' : x.s.lokaal) + '</td><td class="mono"><b>' + x.g.id + '</b></td><td>' + esc(x.g.module) + '</td><td>' + esc(x.g.klas) + '</td><td>' + esc(x.g.docenten.join('; ')) + '</td><td class="num">' + R.fmt(x.s.uren) + '</td><td class="klein">' + x.deel + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      (r.volgorde.length ? '<p class="klein">Nog niet ingepland: ' + r.volgorde.map(it => it.id).join(', ') + '.</p>' : '');
+  }
+  /* Lokaalbezetting per locatie: per lokaal en lesuur welke assessments er staan (zelfde opmaak als bij het inplannen),
+     met eronder een lijst zodat ook korte (afgekapte) blokken op papier leesbaar zijn. */
+  function lokaalBezettingHtml(r) {
+    const TV = m.tijdvakken;
+    const dagen = []; TV.forEach(t => { const d = dagVan(t); if (!dagen.length || dagen[dagen.length - 1].dag !== d) dagen.push({ dag: d, n: 0 }); dagen[dagen.length - 1].n += t.uren; });
+    const kop = '<thead><tr><th class="rnaam"></th>' + dagen.map(d => '<th colspan="' + d.n + '" class="rdag dd-grens">' + esc(d.dag) + '</th>').join('') + '</tr><tr><th class="rnaam klein">dagdeel · lesuur</th>' +
+      TV.map(t => { let h = ''; for (let u = 0; u < t.uren; u++) h += '<th class="ruur' + (u === 0 ? ' dd-grens' : '') + '">' + (u === 0 ? esc(t.label.split(/[-\s]/)[1] || t.label) : u + 1) + '</th>'; return h; }).join('') + '</tr></thead>';
+    return m.locaties.map(l => {
+      const ro = r.lokaalRooster[l.naam] || {};
+      const max = Math.max.apply(null, TV.map(t => Math.max(M.lokalenIn(m, l.naam, t.id), Math.max.apply(null, Object.keys(ro[t.id] || {}).map(Number).concat([0])))).concat([0]));
+      const totaal = TV.reduce((s, t) => s + M.lokalenIn(m, l.naam, t.id) * t.uren, 0);
+      const lijst = []; let gebruikt = 0;
+      let rijen = '';
+      for (let i = 1; i <= max; i++) {
+        rijen += '<tr><th class="rnaam">Lokaal ' + i + '</th>' + TV.map(t => {
+          const n = M.lokalenIn(m, l.naam, t.id), items = (ro[t.id] || {})[i] || []; let h = '', g = 0;
+          items.forEach((x, k) => {
+            const u = Math.max(1, Math.min(t.uren - g, Math.round(x.uren))); if (u <= 0) return;
+            h += '<td colspan="' + u + '" class="gepl' + (i > n ? ' extra' : '') + (k === 0 ? ' dd-grens' : '') + '" title="' + esc(x.id + ' ' + x.module + ' · ' + x.klas + ' · ' + R.fmt(x.uren) + 'u') + '"><div class="rblok"><b>' + x.id + '</b> ' + esc(x.klas) + '</div></td>';
+            g += u; gebruikt += x.uren;
+            lijst.push({ pos: TV.indexOf(t), t, i, x, extra: i > n });
+          });
+          for (let u = g; u < t.uren; u++) h += '<td class="' + (i <= n ? 'vrij' : 'grijs') + (u === 0 ? ' dd-grens' : '') + '"></td>';
+          return h;
+        }).join('') + '</tr>';
+      }
+      lijst.sort((a, b) => a.pos - b.pos || a.i - b.i);
+      const kopje = '<h3 style="margin:14px 0 6px">' + esc(l.naam) + ' <span class="klein" style="font-weight:400">· ' + l.lokalen + (l.lokalen === 1 ? ' lokaal' : ' lokalen') + ' · ' + R.fmt(gebruikt) + ' van ' + R.fmt(totaal) + ' lokaaluren gebruikt</span></h3>';
+      if (!max) return kopje + '<p class="klein">Geen lokalen.</p>';
+      return '<div class="lokaalblok">' + kopje + '<div class="rasterkader">' + '<table class="raster">' + kop + '<tbody>' + rijen + '</tbody></table></div>' +
+        (lijst.length ? '<ul class="lokaallijst">' + lijst.map(y => '<li><b>' + esc(y.t.label) + '</b> lokaal ' + y.i + (y.extra ? ' <span class="waarsch">(extra)</span>' : '') + ': <b>' + y.x.id + '</b> ' + esc(y.x.module) + ' · ' + esc(y.x.klas) + ' (' + R.fmt(y.x.uren) + 'u)</li>').join('') + '</ul>' : '<p class="klein">Nog niets ingepland op deze locatie.</p>') + '</div>';
+    }).join('');
+  }
+  const AFDRUKDELEN = [
+    ['resultaat', 'Planningsresultaat (per dagdeel)'], ['volgorde', 'Planningsvolgorde (nog te plannen)'], ['matrix', 'Afhankelijkheden'],
+    ['bezInvoer', 'Bezetting bij invoer'], ['bezNa', 'Bezetting na planning'], ['lokalen', 'Lokalen per dagdeel'], ['lokaalBezetting', 'Lokaalbezetting per locatie'], ['indeling', 'Lokaalindeling'],
+    ['beschDoc', 'Beschikbaarheid docenten'], ['beschKlas', 'Beschikbaarheid klassen/groepen'], ['interventies', 'Interventies']];
   function renderExport() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe.</section>'; return; }
-    const r = analyse(), datum = new Date().toLocaleString('nl-NL');
-    let vorig = null;
-    const rijen = r.volgorde.map(it => { const g = vorig !== null && it.eiland !== vorig; vorig = it.eiland;
-      return '<tr' + (g ? ' class="eilandgrens"' : '') + '><td class="num">' + it.volgnummer + '</td><td class="mono"><b>' + it.id + '</b></td><td>' + esc(it.module) + '</td><td>' + esc(it.klas) + '</td><td>' + esc(it.locatie) + '</td><td>' + esc(it.docenten.join('; ')) + '</td><td class="num">' + R.fmt(it.uren) + '</td><td class="num">' + R.fmt(it.overlap) + '</td><td>' + (it.prio === Infinity ? 'geen ruimte' : R.fmtKrapte(it.prio)) + '</td><td>' + esc(it.knelpunt) + '</td><td>' + (it.eiland === 'los' ? 'los' : it.eiland) + '</td><td>' + (it.volgtUit ? it.volgtUit.id + ' via ' + esc(it.volgtUit.via.naam) : '') + '</td><td style="min-width:90px"></td></tr>'; }).join('');
+    const r = analyse(), datum = new Date().toLocaleString('nl-NL'), k = ui.afdruk, alle = ui.matrixModus === 'alle';
+    let vorig = null, n = 0;
+    const kop = (titel, bron) => '<div' + (n++ ? ' class="pagina-breuk"' : '') + '><h2>' + titel + '</h2><div class="bron">' + bron + '</div></div>';
+    const rijen = r.volgorde.map(it => {
+      const g = vorig !== null && it.eiland !== vorig; vorig = it.eiland;
+      return '<tr' + (g ? ' class="eilandgrens"' : '') + '><td class="num">' + it.volgnummer + '</td><td class="mono"><b>' + it.id + '</b></td><td>' + esc(it.module) + '</td><td>' + esc(it.klas) + '</td><td>' + esc(it.locatie) + '</td><td>' + esc(it.docenten.join('; ')) + '</td><td class="num">' + R.fmt(it.uren) + '</td><td class="num">' + R.fmt(it.overlap) + '</td><td>' + (it.prio === Infinity ? 'geen ruimte' : R.fmtKrapte(it.prio)) + '</td><td>' + esc(it.knelpunt) + '</td><td>' + (it.eiland === 'los' ? 'los' : it.eiland) + '</td><td>' + (it.volgtUit ? it.volgtUit.id + ' via ' + esc(it.volgtUit.via.naam) : '') + '</td><td style="min-width:90px"></td></tr>';
+    }).join('');
+    const rm = alle ? R.analyseerZonderPlanning(m) : r;
+    let h = '';
+    if (k.resultaat) h += kop('Planningsresultaat — ' + esc(m.naam), r.gepland.length + ' van ' + m.assessments.length + ' assessments ingepland · per dagdeel, locatie en lokaal · ' + datum + '. Binnen een dagdeel liggen de lesuren niet vast.') + resultaatTabel(r);
+    if (k.volgorde) h += kop('Planningsvolgorde — ' + esc(m.naam), 'Invoerversie ' + m.invoerversie + ' · drempel eilanden ' + Math.round(r.drempel * 100) + '% · ' + datum + (r.gepland.length ? ' · ' + r.gepland.length + ' assessment(s) al gepland en niet in deze lijst' : '')) +
+      (r.volgorde.length ? '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th class="num">Samen vrij</th><th>Prioriteit</th><th>Knelpunt</th><th>Eiland</th><th>Volgt uit</th><th>Gepland op</th></tr></thead><tbody>' + rijen + '</tbody></table></div>' : '<p class="klein">Alles is ingepland.</p>');
+    if (k.matrix) h += kop('Afhankelijkheden — ' + (alle ? 'alle assessments, vanaf het begin' : 'nog te plannen'), 'In planningsvolgorde. D = gedeelde docent, K = gedeelde klas; kleur = bezetting van wat gedeeld wordt. Lokalen tellen niet mee.' + (alle ? ' ✓ = al ingepland.' : '')) +
+      (rm.volgorde.length ? legendaMatrix(rm) + '<div class="matrixkader">' + matrixHtml(rm, false, alle) + '</div>' : '<p class="klein">Alles is ingepland; kies bij Afhankelijkheden "alle, vanaf het begin".</p>');
+    if (k.bezInvoer) h += kop('Bezetting bij invoer', 'Zoals de invoer is, alsof er nog niets gepland is.') + bezettingTabel(R.analyseerZonderPlanning(m));
+    if (k.bezNa) h += kop('Bezetting na planning', (r.gepland.length ? 'Na de ' + r.gepland.length + ' al ingeplande assessment(s). ' : 'Er is nog niets ingepland; gelijk aan de bezetting bij invoer. ') + BEZETTING_UITLEG) + bezettingTabel(r);
+    if (k.lokalen) h += kop('Lokalen per dagdeel', LOKAALDRUK_UITLEG) + legendaLokaaldruk() + lokaaldrukTabel(r, false) + tekortenHtml(r);
+    if (k.lokaalBezetting) h += kop('Lokaalbezetting per locatie', 'Per lokaal en lesuur welke assessments zijn ingepland. Binnen een dagdeel liggen de lesuren niet vast; ingeplande assessments staan vooraan in het dagdeel. Wit = vrij, grijs = geen lokaal, rood = extra lokaal nodig.') + lokaalBezettingHtml(r);
+    if (k.indeling) h += kop('Lokaalindeling (ingepast)', 'Per locatie en dagdeel welke assessments in welk lokaal zijn ingepast. Volgorde binnen een lokaal is niet vastgelegd.') + lokaalRoosterHtml(r);
+    if (k.beschDoc) h += kop('Beschikbaarheid docenten', 'De beschikbaarheid waarop de volgorde is gebaseerd (invoerversie ' + m.invoerversie + ').') + legendaBeschikbaarheid() + beschikbaarheidTabel('docent', r);
+    if (k.beschKlas) h += kop('Beschikbaarheid klassen/groepen', 'De beschikbaarheid waarop de volgorde is gebaseerd (invoerversie ' + m.invoerversie + ').') + legendaBeschikbaarheid() + beschikbaarheidTabel('klas', r);
+    if (k.interventies) h += kop('Interventies', 'Wat is aangepast om knelpunten op te lossen, met wie overlegd en de status. Nieuwste bovenaan.') + interventieTabel(ivGesorteerd(), false);
+    const keuze = '<div class="afdrukkeuze"><span class="klein"><b>Afdrukken:</b></span>' +
+      AFDRUKDELEN.map(([sl, naam]) => '<label class="vinkje"><input type="checkbox" data-afdruk="' + sl + '"' + (k[sl] ? ' checked' : '') + '> ' + naam + '</label>').join('') +
+      '<span class="rij"><button class="knop klein-k" data-afdrukset="resultaat">Alleen resultaat</button><button class="knop klein-k" data-afdrukset="alles">Alles</button><button class="knop klein-k" data-afdrukset="niets">Niets</button></span>' +
+      (k.matrix ? '<label class="klein">Afhankelijkheden: <select data-afdrukmatrix><option value="open"' + (alle ? '' : ' selected') + '>nog te plannen</option><option value="alle"' + (alle ? ' selected' : '') + '>alle, vanaf het begin</option></select></label>' : '') + '</div>';
     inhoud.innerHTML =
-      '<section class="paneel breed geen-afdruk"><div class="rij tussen"><div><h2>Export &amp; afdrukken</h2><p class="klein">Het werkbestand bevat de invoer (Assessments, Locaties, Docenten, Klassen), de planning en de instellingen, zodat je het later weer kunt openen, plus de uitvoer: de planningsvolgorde, de afhankelijkhedenmatrix, alle koppelingen, de bezetting, de lokalen per dagdeel (met advies voor extra lokalen), de lokaalindeling en de beschikbaarheid van docenten en klassen waarop de volgorde is gebaseerd. Sla bestanden met echte namen alleen op in een beveiligde omgeving.</p></div>' +
-      '<div class="rij"><button class="knop primair" id="exp-xlsx">Werkbestand opslaan (.xlsx)</button><button class="knop" id="exp-print">Afdrukken / PDF</button></div></div>' + (r.fouten.length ? meldingenPaneel(r) : '') + '</section>' +
-      '<section class="paneel breed afdruk"><div><h2>Planningsvolgorde — ' + esc(m.naam) + '</h2><div class="bron">Invoerversie ' + m.invoerversie + ' · drempel eilanden ' + Math.round(r.drempel * 100) + '% · ' + datum + (r.gepland.length ? ' · ' + r.gepland.length + ' assessment(s) al gepland en niet in deze lijst' : '') + '</div></div>' +
-      '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th class="num">Samen vrij</th><th>Prioriteit</th><th>Knelpunt</th><th>Eiland</th><th>Volgt uit</th><th>Gepland op</th></tr></thead><tbody>' + rijen + '</tbody></table></div>' +
-      '<div class="pagina-breuk"><h2>Afhankelijkheden</h2><div class="bron">Zelfde volgorde als hierboven. D = gedeelde docent, K = gedeelde klas; kleur = bezetting van wat gedeeld wordt. Lokalen tellen niet mee.</div></div>' + legendaMatrix(r) +
-      '<div class="matrixkader">' + matrixHtml(r, false) + '</div>' +
-      '<div class="pagina-breuk"><h2>Bezetting bij invoer</h2><div class="bron">Zoals de invoer is, alsof er nog niets gepland is.</div></div>' + bezettingTabel(R.analyseerZonderPlanning(m)) +
-      '<div class="pagina-breuk"><h2>Bezetting na planning</h2><div class="bron">' + (r.gepland.length ? 'Na de ' + r.gepland.length + ' al ingeplande assessment(s). ' : 'Er is nog niets ingepland; gelijk aan de bezetting bij invoer. ') + BEZETTING_UITLEG + '</div></div>' + bezettingTabel(r) +
-      '<div class="pagina-breuk"><h2>Lokalen per dagdeel</h2><div class="bron">' + LOKAALDRUK_UITLEG + '</div></div>' + legendaLokaaldruk() + lokaaldrukTabel(r, false) + tekortenHtml(r) +
-      (Object.keys(r.lokaalRooster).length ? '<div class="pagina-breuk"><h2>Lokaalindeling (ingepast)</h2><div class="bron">Per locatie en dagdeel welke assessments in welk lokaal zijn ingepast. Volgorde binnen een lokaal is niet vastgelegd.</div></div>' + lokaalRoosterHtml(r) : '') +
-      '<div class="pagina-breuk"><h2>Beschikbaarheid docenten</h2><div class="bron">De beschikbaarheid waarop de volgorde is gebaseerd (invoerversie ' + m.invoerversie + ').</div></div>' + legendaBeschikbaarheid() + beschikbaarheidTabel('docent', r) +
-      '<div class="pagina-breuk"><h2>Beschikbaarheid klassen/groepen</h2><div class="bron">De beschikbaarheid waarop de volgorde is gebaseerd (invoerversie ' + m.invoerversie + ').</div></div>' + legendaBeschikbaarheid() + beschikbaarheidTabel('klas', r) +
-      '</section>';
+      '<section class="paneel breed geen-afdruk" style="flex:1 1 100%"><div class="rij tussen"><div><h2>Export &amp; afdrukken</h2><p class="klein">Het werkbestand bevat de invoer (Assessments, Locaties, Docenten, Klassen), de planning en de instellingen, zodat je het later weer kunt openen, plus alle uitvoer van de analyse. Bij afdrukken kies je hieronder welke onderdelen meegaan; de voorvertoning eronder toont precies wat er wordt afgedrukt. Sla bestanden met echte namen alleen op in een beveiligde omgeving.</p></div>' +
+      '<div class="rij"><button class="knop primair" id="exp-xlsx">Werkbestand opslaan (.xlsx)</button><button class="knop" id="exp-print"' + (n ? '' : ' disabled') + '>Afdrukken / PDF</button></div></div>' + keuze + (r.fouten.length ? meldingenPaneel(r) : '') + '</section>' +
+      '<section class="paneel breed afdruk" style="flex:1 1 100%">' + (h || '<p class="klein">Kies hierboven minstens één onderdeel om af te drukken.</p>') + '</section>';
   }
 
   /* ================= gebeurtenissen ================= */
@@ -619,9 +762,30 @@
       const on = d('[data-ontplan]'); if (on) { M.ontplan(m, on.dataset.ontplan); na(); renderVolgorde(); toonOk(on.dataset.ontplan + ' staat weer bij de nog te plannen assessments.'); }
       return;
     }
+    if (ui.tab === 'interventies') {
+      if (t.id === 'iv-betreft-knop') { ivVoegBetreftToe(); return; }
+      const cw = d('[data-ivchipweg]'); if (cw) { ivLeesForm(); ui.ivForm.betreft.splice(+cw.dataset.ivchipweg, 1); renderInterventies(); return; }
+      const bw = d('[data-ivbewerk]');
+      if (bw) { const iv = (m.interventies || []).find(x => x.id === bw.dataset.ivbewerk); if (iv) { ui.ivBewerk = iv.id; ui.ivForm = JSON.parse(JSON.stringify(iv)); renderInterventies(); window.scrollTo(0, 0); } return; }
+      if (t.id === 'iv-annuleer') { ui.ivBewerk = null; ui.ivForm = null; renderInterventies(); return; }
+      if (t.id === 'iv-verwijder') { if (window.confirm('Interventie ' + ui.ivBewerk + ' verwijderen?')) { M.verwijderInterventie(m, ui.ivBewerk); ui.ivBewerk = null; ui.ivForm = null; bewaar(); renderInterventies(); toonOk('Interventie verwijderd.'); } return; }
+      if (t.id === 'iv-opslaan') {
+        ivLeesForm(); const f = ui.ivForm;
+        if ($('#iv-betreft') && $('#iv-betreft').value.trim()) { ivVoegBetreftToe(); return; }
+        const fout = [];
+        if (!f.datum) fout.push({ bron: 'Interventie', melding: 'Er is geen datum ingevuld.', herstel: 'Vul de datum van het overleg in.' });
+        if (!f.wat) fout.push({ bron: 'Interventie', melding: '"Wat is aangepast" is leeg.', herstel: 'Beschrijf kort wat je hebt aangepast of voorgesteld.' });
+        if (fout.length) { toonFouten(fout); return; }
+        if (ui.ivBewerk) { M.wijzigInterventie(m, ui.ivBewerk, f); toonOk('Interventie ' + ui.ivBewerk + ' aangepast.'); }
+        else { const n = M.voegInterventieToe(m, f); toonOk('Interventie ' + n.id + ' vastgelegd.'); }
+        ui.ivBewerk = null; ui.ivForm = null; bewaar(); renderInterventies(); return;
+      }
+      return;
+    }
     if (ui.tab === 'matrix') {
       const td = d('#pm td[data-i]');
-      if (td) { const r = analyse(); ui.matrixSel = [r.volgorde[+td.dataset.i].id, r.volgorde[+td.dataset.j].id]; document.querySelectorAll('#pm .gekozen').forEach(x => x.classList.remove('gekozen')); td.classList.add('gekozen'); renderMatrixPaneel(r); }
+      const mm = d('[data-mmodus]'); if (mm) { ui.matrixModus = mm.dataset.mmodus; ui.matrixSel = null; renderMatrix(); return; }
+      if (td) { const r = matrixAnalyse(); ui.matrixSel = [r.volgorde[+td.dataset.i].id, r.volgorde[+td.dataset.j].id]; document.querySelectorAll('#pm .gekozen').forEach(x => x.classList.remove('gekozen')); td.classList.add('gekozen'); renderMatrixPaneel(r); }
       return;
     }
     if (ui.tab === 'locaties') {
@@ -637,11 +801,15 @@
       return;
     }
     if (ui.tab === 'export') {
+      const ad = d('[data-afdrukset]');
+      if (ad) { const set = ad.dataset.afdrukset; Object.keys(ui.afdruk).forEach(x => { ui.afdruk[x] = set === 'alles' || (set === 'resultaat' && (x === 'resultaat' || x === 'indeling' || x === 'lokaalBezetting')); }); renderExport(); return; }
+      if (t.dataset.afdruk) { ui.afdruk[t.dataset.afdruk] = t.checked; renderExport(); return; }
       if (t.id === 'exp-xlsx') opslaan();
       else if (t.id === 'exp-print') window.print();
     }
   });
   inhoud.addEventListener('change', e => {
+    if (e.target.dataset && e.target.dataset.afdrukmatrix !== undefined) { ui.matrixModus = e.target.value; renderExport(); return; }
     const t = e.target;
     if (t.dataset.ass) { const f = M.wijzigAssessment(m, t.dataset.ass, t.dataset.veld, t.value); if (f) { toonFouten([f]); renderAssessments(); return; } na(); if (t.dataset.veld !== 'module') renderAssessments(); return; }
     if (t.dataset.hernoem) { const f = M.hernoemRes(m, ui.soort, t.dataset.hernoem, t.value); if (f) toonFouten([f]); else na(); renderBeschikbaarheid(); return; }
@@ -660,10 +828,12 @@
     if (t.id === 'drempel') { const v = Math.max(0, Math.min(100, parseFloat(t.value) || 0)) / 100; m.instellingen.drempel = v; m.invoerversie++; na(); renderVolgorde(); }
   });
   inhoud.addEventListener('input', e => {
+    if (e.target.id === 'iv-zoek') { ui.ivZoek = e.target.value; ivFilter(); return; }
     if (e.target.id === 'besch-zoek') { ui.beschZoek[ui.soort] = e.target.value; beschFilter(); return; }
     if (e.target.id === 'zoek') { const q = e.target.value.trim().toLowerCase(); document.querySelectorAll('#ass-rijen tr').forEach(tr => { tr.style.display = !q || (tr.dataset.zoek || '').includes(q) ? '' : 'none'; }); }
   });
   inhoud.addEventListener('keydown', e => {
+    if (e.target.id === 'iv-betreft' && e.key === 'Enter') { e.preventDefault(); ivVoegBetreftToe(); return; }
     if (e.target.id === 'nieuwe-res' && e.key === 'Enter') { e.preventDefault(); $('#voeg-res').click(); }
   });
 

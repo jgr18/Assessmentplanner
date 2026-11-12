@@ -172,6 +172,34 @@
       }
     }
 
+    /* Interventies (optioneel) */
+    const ivb = await wb.blad('Interventies');
+    if (ivb && ivb.length) {
+      const k = ivb[0], cD = kolomVan(k, ['datum']), cB = kolomVan(k, ['betreft']), cW = kolomVan(k, ['watisaangepast', 'wat', 'aanpassing']), cR = kolomVan(k, ['reden']), cO = kolomVan(k, ['overlegdmet', 'overlegd']), cS = kolomVan(k, ['status']), cI = kolomVan(k, ['id']);
+      m.interventies = [];
+      const leesDatum = v => {
+        const t = tekst(v); let x;
+        if ((x = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) return x[3] + '-' + x[2].padStart(2, '0') + '-' + x[1].padStart(2, '0');
+        if ((x = t.match(/^(\d{4})-(\d{2})-(\d{2})/))) return x[1] + '-' + x[2] + '-' + x[3];
+        if (/^\d{5}(\.\d+)?$/.test(t)) { const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(+t) * 86400000); return d.toISOString().slice(0, 10); } /* Excel-datumgetal */
+        return '';
+      };
+      ivb.forEach((r, i) => {
+        if (i === 0) return;
+        const wat = cW >= 0 ? tekst(r[cW]) : '', bet = cB >= 0 ? tekst(r[cB]) : '';
+        if (!wat && !bet) return;
+        const bron = 'Tabblad Interventies, rij ' + (i + 1);
+        const datum = cD >= 0 ? leesDatum(r[cD]) : '';
+        if (cD >= 0 && tekst(r[cD]) && !datum) let_op(bron, 'Datum "' + tekst(r[cD]) + '" is niet herkend; de interventie is zonder datum ingelezen.', 'Schrijf de datum als dd-mm-jjjj.');
+        let status = cS >= 0 ? tekst(r[cS]) : ''; const st = AP.model.STATUSSEN.find(s => s.toLowerCase() === status.toLowerCase());
+        if (status && !st) let_op(bron, 'Status "' + status + '" is onbekend; "In afwachting" aangenomen.', 'Kies Akkoord, In afwachting, Niet akkoord of Vervallen.');
+        const betreft = AP.model.leesBetreft(bet);
+        betreft.forEach(b => { const bestaat = b.soort === 'ass' ? m.assessments.some(a => a.id === b.naam) : (b.soort === 'docent' ? m.docenten : m.klassen).some(x => x.naam === b.naam); if (!bestaat) let_op(bron, (b.soort === 'ass' ? 'Assessment ' : b.soort === 'docent' ? 'Docent ' : 'Klas ') + b.naam + ' bij "Betreft" staat niet in de invoer.', 'Controleer de spelling; de interventie is wel ingelezen.'); });
+        const iv = AP.model.voegInterventieToe(m, { datum, betreft, wat, reden: cR >= 0 ? tekst(r[cR]) : '', overlegdMet: cO >= 0 ? tekst(r[cO]) : '', status: st || 'In afwachting' });
+        if (cI >= 0 && /^I\d+$/i.test(tekst(r[cI])) && !m.interventies.some(x => x !== iv && x.id === tekst(r[cI]).toUpperCase())) iv.id = tekst(r[cI]).toUpperCase();
+      });
+    }
+
     if (!m.assessments.length && !fouten.length) let_op('Tabblad Assessments', 'Er staan nog geen assessments in het bestand.', 'Vul het tabblad Assessments en open het bestand opnieuw, of voeg ze in de app toe.');
     m.invoerversie = (m.invoerversie || 0) + 1;
     return { model: AP.model.normaliseer(m), fouten, waarschuwingen, soort: isWerkbestand ? 'werkbestand' : 'sjabloon' };

@@ -80,6 +80,9 @@
     function opties(a) {
       const loc = locVan(a.klas), uit = []; if (!loc) return uit;
       const cap = tv => mensenCap(a, tv); /* lokalen zijn geen grens: zonder vrij lokaal volgt de melding 'extra lokaal nodig' */
+      /* liever geen twee assessments van dezelfde klas op één dag */
+      const klasDag = {}; geplandeAss.forEach(g => { if (g.klas === a.klas) g.gepland.forEach(s => { if (U[s.tv] !== undefined) (klasDag[dag[s.tv]] = klasDag[dag[s.tv]] || new Set()).add(g.id); }); });
+      const zelfdeDag = tv => klasDag[dag[tv]] ? a.klas + ' heeft op ' + dag[tv] + ' al ' + [...klasDag[dag[tv]]].join(', ') : '';
       const markeer = segs => { segs.forEach(s => { if (isExtra(loc, s.tv, s.lokaal)) s.extra = true; }); return segs; };
       const waarsch = tv => { const w = locatieWissel(a, dag[tv]); return w.length ? 'Op ' + dag[tv] + ' al op een andere locatie: ' + w.join(', ') : ''; };
       TV.forEach((t, i) => {
@@ -87,7 +90,7 @@
         if (cap(t.id) >= a.uren) {
           const lk = besteLokaal(loc, t.id, a.uren);
           const segs = markeer([{ tv: t.id, uren: a.uren, lokaal: lk }]);
-          uit.push({ segmenten: segs, span: false, waarschuwing: waarsch(t.id), extraLokaal: segs.some(s => s.extra), restNa: restIn(loc, t.id, lk) - a.uren, start: i });
+          uit.push({ segmenten: segs, span: false, waarschuwing: waarsch(t.id), zelfdeDag: zelfdeDag(t.id), extraLokaal: segs.some(s => s.extra), restNa: restIn(loc, t.id, lk) - a.uren, start: i });
         }
         /* doorlopend over aaneengesloten tijdvakken van dezelfde dag: eerste deel aan het eind, middelste vol, laatste aan het begin */
         let midden = 0;
@@ -103,7 +106,7 @@
               const n = Math.min.apply(null, segs.map(s => M().lokalenIn(m, loc, s.tv)));
               for (let l = 1; l <= n; l++) if (segs.every(s => lokaalRests(loc, s.tv)[l - 1] >= s.uren)) { segs.forEach(s => { s.lokaal = l; }); break; }
               markeer(segs);
-              uit.push({ segmenten: segs, span: true, waarschuwing: waarsch(t.id), extraLokaal: segs.some(s => s.extra), restNa: 0, start: i });
+              uit.push({ segmenten: segs, span: true, waarschuwing: waarsch(t.id), zelfdeDag: zelfdeDag(t.id), extraLokaal: segs.some(s => s.extra), restNa: 0, start: i });
               break;
             }
           }
@@ -112,7 +115,7 @@
           if (midden >= a.uren) break;
         }
       });
-      uit.sort((p, q) => (!!p.waarschuwing - !!q.waarschuwing) || (!!p.extraLokaal - !!q.extraLokaal) || (p.span - q.span) || (p.restNa - q.restNa) || (p.start - q.start));
+      uit.sort((p, q) => (!!p.waarschuwing - !!q.waarschuwing) || (!!p.zelfdeDag - !!q.zelfdeDag) || (!!p.extraLokaal - !!q.extraLokaal) || (p.span - q.span) || (p.restNa - q.restNa) || (p.start - q.start));
       return uit;
     }
 
@@ -167,8 +170,9 @@
       } else if (opt.length && !zonderWissel.length) {
         waarschuwingen.push({ bron, melding: 'Past alleen als een docent die dag op twee locaties is.', herstel: 'Plan bij voorkeur eerst anders, of accepteer de locatiewissel bij het inplannen.' });
       }
+      const klasDagTv = {}; TV.forEach(t => { if (geplandeAss.some(g => g.klas === a.klas && g.gepland.some(s => U[s.tv] !== undefined && dag[s.tv] === dag[t.id]))) klasDagTv[t.id] = true; });
       const capPerTv = {}; TV.forEach(t => { capPerTv[t.id] = locatieWissel(a, dag[t.id]).length ? -mensenCap(a, t.id) : mensenCap(a, t.id); });
-      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, alleenMetExtraLokaal: opt.length > 0 && opt.every(o => o.extraLokaal), opties: opt, res, capPerTv };
+      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, alleenMetExtraLokaal: opt.length > 0 && opt.every(o => o.extraLokaal), opties: opt, res, capPerTv, klasDagTv };
     });
 
     /* --- koppelingen --- */

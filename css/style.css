@@ -294,3 +294,45 @@ table.raster td.samen-deels { background: #EAF3DE; color: #3B6D11; }
 .kop .versie { font-size: 11px; color: #9AA0A6; border: 1px solid #5A6068; border-radius: 999px; padding: 1px 7px; }
 table.lijst tr.laatst td { background: #EAF1FD; }
 table.raster td.anderloc { background: #FFFFFF; box-shadow: inset 0 -6px 0 #E24B4A; }
+table.raster td.samen-dag { background: #CECBF6; color: #26215C; }
+.optie.zelfdedag { border-color: #AFA9EC; background: #F4F3FE; }
+.zelfdedag-tekst { color: #534AB7; font-size: 12px; }
+.afdrukkeuze { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 12px; margin-top: 10px; border: 1px solid #DCE6F6; border-radius: 8px; background: #F6F9FE; }
+.afdrukkeuze .vinkje { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.afdrukkeuze .vinkje input { width: 16px; height: 16px; margin: 0; }
+.gepland-merk { font-size: 10px; font-weight: 600; color: #0F6E56; background: #E1F5EE; border-radius: 4px; padding: 0 4px; margin-right: 4px; }
+table.lijst.resultaat td { white-space: nowrap; }
+.lokaallijst { columns: 3 280px; column-gap: 24px; margin: 8px 0 0; padding-left: 18px; font-size: 12px; }
+.lokaallijst li { break-inside: avoid; margin: 1px 0; }
+.lokaalblok { break-inside: avoid; }
+@media print {
+  .rasterkader { overflow: visible; border: 0; }
+  table.raster { font-size: 9px; }
+  table.raster td, table.raster th.ruur { width: 13px; min-width: 13px; max-width: 13px; }
+  table.raster th.rnaam { min-width: 80px; position: static; }
+  table.raster .rblok { font-size: 8px; }
+  table.raster td, table.raster th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.ivform { display: grid; grid-template-columns: 150px minmax(260px, 1.4fr) 1.4fr 1.2fr 1fr 140px; gap: 10px; align-items: start; }
+@media (max-width: 1300px) { .ivform { grid-template-columns: 150px 1fr 1fr; } }
+.ivform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--tekst-3); }
+.ivform input, .ivform select, .ivform textarea { font: inherit; font-size: 13px; padding: 7px 8px; border: 1px solid #C9C9C4; border-radius: 6px; background: #FFFFFF; color: inherit; }
+.ivform textarea { resize: vertical; min-height: 36px; }
+.ivchips { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; border: 1px solid #C9C9C4; border-radius: 6px; background: #FFFFFF; min-height: 36px; align-items: center; }
+.ivkies { display: inline-flex; gap: 4px; flex: 1 1 140px; }
+.ivkies input { border: 0 !important; padding: 4px !important; flex: 1; min-width: 100px; outline: none; }
+.ivchip { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; margin: 1px 0; }
+.ivchip.c-ass { background: #EEEDFE; color: #3C3489; }
+.ivchip.c-docent { background: #E6F1FB; color: #0C447C; }
+.ivchip.c-klas { background: #E1F5EE; color: #085041; }
+.chipweg { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 0 0 4px; }
+.ivstatus { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.ivstatus.s-ok { background: #E1F5EE; color: #085041; }
+.ivstatus.s-wacht { background: #FAEEDA; color: #633806; }
+.ivstatus.s-niet { background: #FCEBEB; color: #791F1F; }
+.ivstatus.s-verv { background: #F1EFE8; color: #5F5E5A; }
+.ivreden { font-size: 12px; color: var(--tekst-2); margin-top: 3px; }
+.ivgevolg { font-size: 12px; color: #0F6E56; margin-top: 3px; }
+table.ivlijst td { vertical-align: top; }
+table.ivlijst tr.vervallen td { color: #888780; }
+.ivchip { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

@@ -3,7 +3,7 @@
   'use strict';
   const AP = root.AP = root.AP || {};
   const OPSLAGSLEUTEL = 'assessmentplanner:model';
-  AP.versie = '0.8'; /* versie van de tool; ook in index.html en controle.html (?v=…) */
+  AP.versie = '1.0'; /* versie van de tool; ook in index.html en controle.html (?v=…) */
 
   function standaardTijdvakken() {
     const dagen = ['ma', 'di', 'wo', 'do', 'vr'], delen = [['o', 'ochtend'], ['m', 'middag']];
@@ -26,8 +26,39 @@
       docenten: [],      // { naam, beschikbaar: [tijdvak-id] }
       klassen: [],       // { naam, beschikbaar: [tijdvak-id], locatie }
       assessments: [],   // { id, module, klas, docenten: [naam], uren, gepland: [{ tv, uren, lokaal }] }
-      instellingen: { drempel: 0.2 }
+      instellingen: { drempel: 0.2 },
+      interventies: []   // { id, datum (jjjj-mm-dd), betreft: [{ soort: ass|docent|klas, naam }], wat, reden, overlegdMet, status }
     };
+  }
+
+  /* ---------- interventies: logboek van aanpassingen om knelpunten op te lossen ---------- */
+  const STATUSSEN = ['Akkoord', 'In afwachting', 'Niet akkoord', 'Vervallen'];
+  function schoonInterventie(iv) {
+    return {
+      id: iv.id, datum: String(iv.datum || '').slice(0, 10), status: STATUSSEN.includes(iv.status) ? iv.status : 'In afwachting',
+      betreft: (iv.betreft || []).filter(b => b && b.naam && ['ass', 'docent', 'klas'].includes(b.soort)).map(b => ({ soort: b.soort, naam: String(b.naam) })),
+      wat: String(iv.wat || ''), reden: String(iv.reden || ''), overlegdMet: String(iv.overlegdMet || '')
+    };
+  }
+  function voegInterventieToe(m, iv) {
+    m.interventies = m.interventies || [];
+    const nr = m.interventies.reduce((x, i) => Math.max(x, parseInt(String(i.id).replace(/\D/g, ''), 10) || 0), 0) + 1;
+    const n = schoonInterventie(Object.assign({}, iv, { id: 'I' + String(nr).padStart(3, '0') }));
+    m.interventies.push(n); return n;
+  }
+  function wijzigInterventie(m, id, iv) { const i = (m.interventies || []).findIndex(x => x.id === id); if (i >= 0) m.interventies[i] = schoonInterventie(Object.assign({}, iv, { id })); }
+  function verwijderInterventie(m, id) { m.interventies = (m.interventies || []).filter(x => x.id !== id); }
+  /* Tekst voor Excel: "S005 (Ethiek · E1B); docent: Visser; klas: D2B" — en terug. */
+  function betreftTekst(m, lijst) {
+    return (lijst || []).map(b => { if (b.soort === 'docent') return 'docent: ' + b.naam; if (b.soort === 'klas') return 'klas: ' + b.naam; const a = vindAss(m, b.naam); return b.naam + (a ? ' (' + a.module + ' · ' + a.klas + ')' : ''); }).join('; ');
+  }
+  function leesBetreft(tekst) {
+    return String(tekst || '').split(/[;\n]/).map(x => x.trim()).filter(Boolean).map(x => {
+      const d = x.match(/^docent\s*:\s*(.+)$/i), k = x.match(/^klas(?:\/groep)?\s*:\s*(.+)$/i);
+      if (d) return { soort: 'docent', naam: d[1].trim() };
+      if (k) return { soort: 'klas', naam: k[1].trim() };
+      return { soort: 'ass', naam: x.split(/[\s(]/)[0].toUpperCase() };
+    });
   }
 
   const maakId = n => 'S' + String(n).padStart(3, '0');
@@ -324,6 +355,7 @@
     let teller = m.assessments.reduce((x, a) => Math.max(x, a.gepland.length ? a.planVolgorde || 0 : 0), 0);
     m.assessments.forEach(a => { if (!a.gepland.length) delete a.planVolgorde; else if (!a.planVolgorde) a.planVolgorde = ++teller; });
     m.planTeller = Math.max(m.planTeller || 0, teller);
+    m.interventies = Array.isArray(d.interventies) ? d.interventies.map(schoonInterventie) : [];
     m.formaatversie = 2;
     const max = m.assessments.concat((m.vervallenIds || []).map(id => ({ id }))).reduce((x, a) => Math.max(x, idNummer(a.id) || 0), 0);
     m.volgendeNummer = Math.max(m.volgendeNummer || 1, max + 1);
@@ -336,7 +368,7 @@
   }
   function wisLokaal() { try { root.localStorage.removeItem(OPSLAGSLEUTEL); } catch (e) { /* niets */ } }
 
-  AP.model = {
+  AP.model = { STATUSSEN, voegInterventieToe, wijzigInterventie, verwijderInterventie, betreftTekst, leesBetreft,
     leegModel, maakId, vindRes, vindAss, plakAssessments, plakBeschikbaarheid, wisselBeschikbaar, zetRijBeschikbaar, zetAllesBeschikbaar, zetKolomBeschikbaar, voegResToe,
     wijzigAssessment, verwijderAssessment, gebruikt, verwijderRes, hernoemRes, plan, ontplan,
     voegTijdvakToe, wijzigTijdvak, standaardUren, verwijderTijdvak, verplaatsTijdvak, valideer, normaliseer, bewaarLokaal, laadLokaal, wisLokaal,

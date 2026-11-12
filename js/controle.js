@@ -68,6 +68,12 @@
       if (!it.past || !o.extraLokaal || o.segmenten[0].lokaal !== 2) return { ok: false, detail: 'optie: ' + JSON.stringify(o) };
       M.plan(m, 'S002', o.segmenten); const r2 = R.analyseer(m);
       return { ok: r2.lokaalTekort.length === 1 && r2.lokaaldruk.find(x => x.locatie === 'Deventer').extra >= 1 && r2.waarschuwingen.some(w => /extra nodig/.test(w.melding)), detail: r2.waarschuwingen.map(w => w.melding).join(' ') }; } },
+    { naam: 'Liever niet twee assessments van een klas op één dag', uitleg: 'Klas 1A heeft al een assessment op maandagochtend. Bij het tweede assessment van 1A staan de opties op dinsdag bovenaan; maandag kan nog wel, maar lager en gemarkeerd.', test() {
+      const m = bouw([['A', '1A', 'P', '2'], ['B', '1A', 'Q', '2']], { P: '*', Q: '*' }, { '1A': '*' }, ['ma-o', 'ma-m', 'di-o']);
+      m.klassen.forEach(k => { k.locatie = 'Deventer'; });
+      M.plan(m, 'S001', [{ tv: 'T0', uren: 2, lokaal: 1 }]);
+      const it = R.analyseer(m).volgorde[0], eerste = it.opties[0], maandag = it.opties.filter(o => o.zelfdeDag);
+      return { ok: eerste.segmenten[0].tv === 'T2' && !eerste.zelfdeDag && maandag.length > 0 && it.opties.indexOf(maandag[0]) > 0, detail: it.opties.map(o => o.segmenten.map(s => s.tv).join('+') + (o.zelfdeDag ? ' (zelfde dag)' : '')).join(', ') }; } },
     { naam: 'Doorlopen over ochtend en middag', uitleg: 'Een assessment van 12 uur vult ochtend (6) en middag (6) van dezelfde dag.', test() {
       const m = bouw([['Groot', '1A', 'P', '12']], { P: '*' }, { '1A': '*' }, ['ma-o', 'ma-m', 'di-o', 'di-m']);
       m.tijdvakken.forEach(t => { t.uren = 6; });

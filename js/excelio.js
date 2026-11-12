@@ -62,7 +62,7 @@
   const GROEP = {
     'Toelichting': 'toelichting', 'Instellingen': 'toelichting',
     'Assessments': 'invoer', 'Locaties': 'invoer', 'Docenten': 'invoer', 'Klassen': 'invoer',
-    'Planning': 'planning', 'Planningsvolgorde': 'planning', 'Lokaalindeling': 'planning',
+    'Planning': 'planning', 'Interventies': 'planning', 'Planningsvolgorde': 'planning', 'Lokaalindeling': 'planning',
     'Afhankelijkheden': 'signalering', 'Koppelingen': 'signalering', 'Bezetting bij invoer': 'signalering', 'Bezetting na planning': 'signalering',
     'Lokalen per dagdeel': 'signalering', 'Beschikbaarheid docenten': 'signalering', 'Beschikbaarheid klassen': 'signalering'
   };
@@ -90,6 +90,7 @@
     regel('Instellingen', 'Naam van de planning en de drempel voor een sterke koppeling (standaard 20%).');
     if (werkbestand) {
       regel('Planning', 'Wat al is ingepast: per assessment het dagdeel, het aantal uren en het lokaalnummer. Een assessment dat doorloopt over ochtend en middag staat op twee regels.');
+      regel('Interventies', 'Logboek van wat je hebt aangepast om knelpunten op te lossen: datum (dd-mm-jjjj), betreft (assessment-ID, "docent: naam" of "klas: naam", gescheiden door ;), wat is aangepast, reden, met wie overlegd en status (Akkoord, In afwachting, Niet akkoord, Vervallen). Wordt bij openen ingelezen.');
       regel('Uitvoer', 'De groene en oranje tabbladen (behalve Planning) zijn uitvoer van de analyse. Bij het openen in de app worden ze genegeerd en opnieuw berekend. Bezetting staat er twee keer in: bij invoer (alsof er niets gepland is) en na planning.');
     }
     regel('Openen', 'In de app: kies "Excel openen" en selecteer dit bestand. De app herkent zelf of het een invoersjabloon of een werkbestand is.');
@@ -118,8 +119,19 @@
     m.assessments.filter(a => a.gepland.length).sort((x, y) => (x.planVolgorde || 0) - (y.planVolgorde || 0)).forEach(a => a.gepland.forEach(s => p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: tvLabel(s.tv), stijl: { rand: true } }, { v: s.uren, stijl: { rand: true } }, { v: s.lokaal, stijl: Object.assign({ rand: true }, a.klas && AP.model.lokalenIn(m, (m.klassen.find(k => k.naam === a.klas) || {}).locatie || '', s.tv) < s.lokaal ? { vulling: 'F7C1C1', vet: true } : {}) }])));
     return kleurEnOrden([toelichtingBlad(true), instellingenBlad(m, true)]
       .concat(invoerBladen(m, { metIds: true, extraRijen: 20 }))
-      .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 10, 8, 8], bevries: { y: 1 } }])
+      .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 10, 8, 8], bevries: { y: 1 } }, interventieBlad(m)])
       .concat(AP.export.bladen(m, r)));
+  }
+  /* Interventies: datum als tekst dd-mm-jjjj, status met keuzelijst. Nieuwste bovenaan. */
+  const datumNl = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.slice(8, 10) + '-' + d.slice(5, 7) + '-' + d.slice(0, 4) : d;
+  function interventieBlad(m) {
+    const KLR = { 'Akkoord': 'E1F5EE', 'In afwachting': 'FAEEDA', 'Niet akkoord': 'FCEBEB', 'Vervallen': 'F1EFE8' };
+    const rijen = [['ID', 'Datum', 'Betreft', 'Wat is aangepast', 'Reden', 'Overlegd met', 'Status'].map(v => ({ v, stijl: KOP }))];
+    const lijst = (m.interventies || []).slice().sort((a, b) => (b.datum || '').localeCompare(a.datum || '') || b.id.localeCompare(a.id));
+    const T = { rand: true, terugloop: true };
+    lijst.forEach(iv => rijen.push([{ v: iv.id, stijl: Object.assign({ rand: true }, INFO) }, { v: datumNl(iv.datum), stijl: { rand: true, getal: 49 } }, { v: AP.model.betreftTekst(m, iv.betreft), stijl: T }, { v: iv.wat, stijl: T }, { v: iv.reden, stijl: T }, { v: iv.overlegdMet, stijl: T }, { v: iv.status, stijl: { rand: true, vulling: KLR[iv.status] } }]));
+    for (let i = 0; i < 20; i++) rijen.push([{ v: '', stijl: { rand: true } }, { v: '', stijl: { rand: true, getal: 49 } }, { v: '', stijl: T }, { v: '', stijl: T }, { v: '', stijl: T }, { v: '', stijl: T }, { v: '', stijl: { rand: true } }]);
+    return { naam: 'Interventies', rijen, kolommen: [7, 12, 34, 44, 34, 26, 14], bevries: { y: 1 }, keuzelijsten: [{ bereik: 'G2:G' + rijen.length, lijst: AP.model.STATUSSEN }] };
   }
 
   AP.excelio = { invoerBladen, sjabloonBladen, werkbestandBladen, instellingenBlad };
