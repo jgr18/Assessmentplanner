@@ -244,7 +244,7 @@
       waarschuwingen.push({ bron: 'Lokalen, ' + l.naam + ' ' + t.label, melding: 'Er is ' + (extraLokalen > 1 ? extraLokalen + ' lokalen' : 'een lokaal') + ' extra nodig (nu ' + n + '): ' + d.tekort.join(', ') + ' ' + (d.tekort.length > 1 ? 'zijn' : 'is') + ' ingepland zonder vrij lokaal.', herstel: 'Vraag het extra lokaal aan en verhoog daarna het aantal lokalen voor dit dagdeel op het tabblad Lokalen.' });
     }));
 
-    const gepland = geplandeAss.map(a => ({ id: a.id, module: a.module, klas: a.klas, locatie: locVan(a.klas), docenten: a.docenten.slice(), uren: a.uren, segmenten: a.gepland.map(s => Object.assign({}, s, locVan(a.klas) && U[s.tv] !== undefined && isExtra(locVan(a.klas), s.tv, s.lokaal) ? { extra: true } : {})) }));
+    const gepland = geplandeAss.slice().sort((x, y) => (y.planVolgorde || 0) - (x.planVolgorde || 0)).map(a => ({ planVolgorde: a.planVolgorde || 0, id: a.id, module: a.module, klas: a.klas, locatie: locVan(a.klas), docenten: a.docenten.slice(), uren: a.uren, segmenten: a.gepland.map(s => Object.assign({}, s, locVan(a.klas) && U[s.tv] !== undefined && isExtra(locVan(a.klas), s.tv, s.lokaal) ? { extra: true } : {})) }));
     /* waarschuwing voor al geplande locatiewissels */
     Object.keys(docentDagLoc).forEach(d => Object.keys(docentDagLoc[d]).forEach(dg => {
       const s = docentDagLoc[d][dg]; if (s.size > 1) waarschuwingen.push({ bron: 'Planning, docent ' + d, melding: 'Op ' + dg + ' ingepland op ' + s.size + ' locaties: ' + Array.from(s).join(', ') + '.', herstel: 'Verplaats bij voorkeur een van deze assessments naar een andere dag.' });

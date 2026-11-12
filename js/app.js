@@ -280,14 +280,16 @@
     const rij = (label, sub, perTv) => '<tr><th class="rnaam">' + label + (sub ? ' <span class="klein">' + sub + '</span>' : '') + '</th>' + TV.map(t => {
       const x = perTv(t); let h = '', gebruikt = 0;
       x.blokken.forEach((b, k) => { const u = Math.max(1, Math.min(t.uren - gebruikt, Math.round(b.uren))); if (u <= 0) return; h += blok(u, 'gepl' + (b.extra ? ' extra' : '') + (k === 0 ? grens(0) : ''), b.id, b.id + ' ' + R.fmt(b.uren) + 'u · ' + b.titel); gebruikt += u; });
-      for (let u = gebruikt; u < t.uren; u++) h += '<td class="' + (x.vrij ? 'vrij' : 'grijs') + (u === 0 ? ' dd-grens' : '') + '"></td>';
+      for (let u = gebruikt; u < t.uren; u++) h += '<td class="' + (x.vrij ? (x.anders ? 'vrij anderloc' : 'vrij') : 'grijs') + (u === 0 ? ' dd-grens' : '') + '"' + (x.vrij && x.anders ? ' title="' + esc(t.label + ': op ' + dagVan(t) + ' al ingepland in ' + x.anders) + '"' : '') + '></td>';
       return h;
     }).join('') + '</tr>';
     const geplandIn = (filter, t) => { const b = []; r.gepland.forEach(g => { if (!filter(g)) return; g.segmenten.forEach(s => { if (s.tv === t.id) b.push({ id: g.id, uren: s.uren, titel: g.module + ' · ' + g.klas + ' · ' + g.docenten.join('; '), extra: s.extra }); }); }); return b; };
     const kopDag = '<tr><th class="rnaam"></th>' + dagen.map(d => '<th colspan="' + d.n + '" class="rdag dd-grens">' + esc(d.dag) + '</th>').join('') + '</tr>';
     const kopTv = '<tr><th class="rnaam klein">dagdeel · lesuur</th>' + TV.map(t => { let h = ''; for (let u = 0; u < t.uren; u++) h += '<th class="ruur' + (u === 0 ? ' dd-grens' : '') + '"' + (u === 0 ? ' title="' + esc(t.label) + '"' : '') + '>' + (u === 0 ? esc(t.label.split(/[-\s]/)[1] || t.label) : u + 1) + '</th>'; return h; }).join('') + '</tr>';
     let h = '<table class="raster"><thead>' + kopDag + kopTv + '</thead><tbody>';
-    it.docenten.forEach(d => { const res = M.vindRes(m, 'docent', d); h += rij('Docent <b>' + esc(d) + '</b>', '', t => ({ vrij: !!res && res.beschikbaar.includes(t.id), blokken: geplandIn(g => g.docenten.includes(d), t) })); });
+    /* per docent en dag: op welke andere locatie(s) hij al is ingepland */
+    const anderLoc = (d, t) => { const dg = dagVan(t), l = new Set(); r.gepland.forEach(g => { if (g.docenten.includes(d) && g.locatie && g.locatie !== loc && g.segmenten.some(s => dagVan(tv(s.tv)) === dg)) l.add(g.locatie + ' (' + g.id + ')'); }); return [...l].join(', '); };
+    it.docenten.forEach(d => { const res = M.vindRes(m, 'docent', d); h += rij('Docent <b>' + esc(d) + '</b>', '', t => ({ vrij: !!res && res.beschikbaar.includes(t.id), anders: anderLoc(d, t), blokken: geplandIn(g => g.docenten.includes(d), t) })); });
     const kl = M.vindRes(m, 'klas', it.klas);
     h += rij('Klas <b>' + esc(it.klas) + '</b>', '', t => ({ vrij: !!kl && kl.beschikbaar.includes(t.id), blokken: geplandIn(g => g.klas === it.klas, t) }));
     /* samen vrij + gekozen optie */
@@ -309,7 +311,7 @@
         }).replace('<tr>', '<tr class="lokaalrij' + (i === 1 ? ' eerste' : '') + '">');
       }
     }
-    return '<div class="rasterkader">' + h + '</tbody></table></div><div class="legenda klein"><span><span class="chip" style="background:#FFFFFF;border:1px solid #9DBCE6"></span>beschikbaar</span><span><span class="chip" style="background:#DEDEDE"></span>niet beschikbaar / geen lokaal</span><span><span class="chip" style="background:#FFF59A;border:1px solid #1F2328"></span>al gepland (binnen het dagdeel vooraan getekend)</span><span><span class="chip" style="background:#C0DD97"></span>docent(en) en klas samen vrij</span><span><span class="chip" style="background:#FAC775"></span>samen vrij, maar met locatiewissel</span><span><span class="chip" style="background:#378ADD"></span>gekozen optie</span><span><span class="chip" style="background:#F7C1C1"></span>extra lokaal nodig</span></div>';
+    return '<div class="rasterkader">' + h + '</tbody></table></div><div class="legenda klein"><span><span class="chip" style="background:#FFFFFF;border:1px solid #9DBCE6"></span>beschikbaar</span><span><span class="chip" style="background:#DEDEDE"></span>niet beschikbaar / geen lokaal</span><span><span class="chip" style="background:#FFF59A;border:1px solid #1F2328"></span>al gepland (binnen het dagdeel vooraan getekend)</span><span><span class="chip" style="background:#E24B4A"></span>docent die dag al op een andere locatie</span><span><span class="chip" style="background:#C0DD97"></span>docent(en) en klas samen vrij</span><span><span class="chip" style="background:#FAC775"></span>samen vrij, maar met locatiewissel</span><span><span class="chip" style="background:#378ADD"></span>gekozen optie</span><span><span class="chip" style="background:#F7C1C1"></span>extra lokaal nodig</span></div>';
   }
   function renderVolgorde() {
     if (!m.assessments.length) { inhoud.innerHTML = '<section class="paneel breed leeg-staat">Voeg eerst assessments toe op het tabblad <b>Assessments</b>.</section>'; return; }
@@ -339,7 +341,7 @@
           '<div class="rij"><button class="knop primair" data-bevestig="' + it.id + '">Inplannen bevestigen</button><button class="knop" data-annuleer>Annuleren</button></div></div></td></tr>';
       }
     });
-    const gepland = r.gepland.map(g => '<tr><td class="mono"><b>' + g.id + '</b></td><td>' + esc(g.module) + '</td><td>' + esc(g.klas) + '</td><td>' + esc(g.locatie) + '</td><td>' + esc(g.docenten.join('; ')) + '</td><td class="num">' + R.fmt(g.uren) + '</td><td>' + esc(segTekst(g.segmenten)) + '</td><td class="rechts"><button class="knop klein-k" data-ontplan="' + g.id + '">Terugzetten</button></td></tr>').join('');
+    const gepland = r.gepland.map((g, i) => '<tr' + (i === 0 ? ' class="laatst"' : '') + '><td class="num klein">' + (r.gepland.length - i) + '</td><td class="mono"><b>' + g.id + '</b></td><td>' + esc(g.module) + '</td><td>' + esc(g.klas) + '</td><td>' + esc(g.locatie) + '</td><td>' + esc(g.docenten.join('; ')) + '</td><td class="num">' + R.fmt(g.uren) + '</td><td>' + esc(segTekst(g.segmenten)) + '</td><td class="rechts"><button class="knop klein-k" data-ontplan="' + g.id + '">Terugzetten</button></td></tr>').join('');
     inhoud.innerHTML =
       '<section class="kolom breed">' + meldingenPaneel(r) +
       '<div class="rij tussen"><div class="rij"><span class="maat">Nog te plannen <b>' + r.volgorde.length + '</b></span><span class="maat">Planningseilanden <b>' + r.eilanden + '</b></span><span class="maat">Los / vulling <b>' + r.los + '</b></span><span class="maat">Gepland <b>' + r.gepland.length + '</b></span></div>' +
@@ -347,7 +349,7 @@
       '<div class="paneel"><h2>Planningsvolgorde</h2><p class="klein">Plan van boven naar beneden. Krapte/prioriteit: hoe hoger, hoe minder speelruimte. "Volgt uit" noemt het eerdere assessment en de gedeelde docent of klas waardoor dit assessment erna komt. Lokalen tellen niet mee in de volgorde en zijn geen beletsel bij het inplannen (die kun je bijvragen); +lokaal = past alleen met een extra lokaal. ⚠ = past alleen als een docent die dag op twee locaties is. Na inplannen rekent de lijst opnieuw met de ruimte die overblijft.</p>' +
       '<div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th class="num">Samen vrij (u)</th><th>Prioriteit</th><th>Knelpunt</th><th>Volgt uit</th><th class="rechts"></th></tr></thead><tbody>' +
       (h || '<tr><td colspan="12" class="klein">Alles is ingepland.</td></tr>') + '</tbody></table></div></div>' +
-      (r.gepland.length ? '<div class="paneel"><h2>Al gepland</h2><div class="tabelkader"><table class="lijst"><thead><tr><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th>Ingepast in</th><th class="rechts"></th></tr></thead><tbody>' + gepland + '</tbody></table></div></div>' : '') +
+      (r.gepland.length ? '<div class="paneel"><h2>Al gepland</h2><p class="klein">Laatst ingepland bovenaan; # = volgorde waarin je ze hebt ingepland. Een verkeerde keuze zet je zo snel terug.</p><div class="tabelkader"><table class="lijst"><thead><tr><th class="num">#</th><th>ID</th><th>Module</th><th>Klas/groep</th><th>Locatie</th><th>Docent(en)</th><th class="num">Uren</th><th>Ingepast in</th><th class="rechts"></th></tr></thead><tbody>' + gepland + '</tbody></table></div></div>' : '') +
       '</section>';
   }
 

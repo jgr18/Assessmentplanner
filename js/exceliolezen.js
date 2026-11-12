@@ -167,7 +167,7 @@
         Object.keys(segs).forEach(id => {
           const a = m.assessments.find(x => x.id === id), som = segs[id].reduce((s, x) => s + x.uren, 0);
           if (Math.abs(som - a.uren) > 1e-9) { let_op('Tabblad Planning, ' + id, 'Ingepland ' + String(som).replace('.', ',') + ' uur, maar het assessment duurt ' + String(a.uren).replace('.', ',') + ' uur. De planning van ' + id + ' is niet overgenomen.', 'Maak de uren op het tabblad Planning gelijk aan de uren op het tabblad Assessments.'); return; }
-          a.gepland = segs[id];
+          a.gepland = segs[id]; m.planTeller = (m.planTeller || 0) + 1; a.planVolgorde = m.planTeller; /* volgorde van de regels = volgorde van plannen */
         });
       }
     }

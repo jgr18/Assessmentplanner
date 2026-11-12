@@ -3,6 +3,7 @@
   'use strict';
   const AP = root.AP = root.AP || {};
   const OPSLAGSLEUTEL = 'assessmentplanner:model';
+  AP.versie = '0.8'; /* versie van de tool; ook in index.html en controle.html (?v=…) */
 
   function standaardTijdvakken() {
     const dagen = ['ma', 'di', 'wo', 'do', 'vr'], delen = [['o', 'ochtend'], ['m', 'middag']];
@@ -187,7 +188,8 @@
   }
 
   /* Inplannen: segmenten [{ tv, uren, lokaal }]. Lokaal = nummer 1..n op de locatie van de klas. */
-  function plan(m, id, segmenten) { const a = vindAss(m, id); if (a) { a.gepland = segmenten.map(s => ({ tv: s.tv, uren: s.uren, lokaal: s.lokaal })); gewijzigd(m); } }
+  /* planVolgorde: volgnummer van het moment van inplannen (hoger = later gepland). */
+  function plan(m, id, segmenten) { const a = vindAss(m, id); if (a) { a.gepland = segmenten.map(s => ({ tv: s.tv, uren: s.uren, lokaal: s.lokaal })); m.planTeller = (m.planTeller || 0) + 1; a.planVolgorde = m.planTeller; gewijzigd(m); } }
 
   /* Locaties en lokalen */
   function lokalenIn(m, locNaam, tv) {
@@ -253,7 +255,7 @@
     if (bijgewerkt.length) gewijzigd(m);
     return { bijgewerkt, fouten };
   }
-  function ontplan(m, id) { const a = vindAss(m, id); if (a) { a.gepland = []; gewijzigd(m); } }
+  function ontplan(m, id) { const a = vindAss(m, id); if (a) { a.gepland = []; delete a.planVolgorde; gewijzigd(m); } }
 
   /* Tijdvakken beheren. Een tijdvak verwijderen haalt het ook uit beschikbaarheid en planning. */
   function voegTijdvakToe(m, label, uren) {
@@ -318,6 +320,10 @@
       }
       return a;
     });
+    /* planvolgorde: ontbrekende nummers aanvullen in de huidige volgorde */
+    let teller = m.assessments.reduce((x, a) => Math.max(x, a.gepland.length ? a.planVolgorde || 0 : 0), 0);
+    m.assessments.forEach(a => { if (!a.gepland.length) delete a.planVolgorde; else if (!a.planVolgorde) a.planVolgorde = ++teller; });
+    m.planTeller = Math.max(m.planTeller || 0, teller);
     m.formaatversie = 2;
     const max = m.assessments.concat((m.vervallenIds || []).map(id => ({ id }))).reduce((x, a) => Math.max(x, idNummer(a.id) || 0), 0);
     m.volgendeNummer = Math.max(m.volgendeNummer || 1, max + 1);

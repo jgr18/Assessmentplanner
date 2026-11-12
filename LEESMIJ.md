@@ -21,7 +21,8 @@ Webtool die laat zien **in welke volgorde je assessments het best kunt inplannen
 - **Eén locatie per dag**: een docent hoort op één dag op één locatie te zijn. Een plaatsing die dat breekt kan wel, maar krijgt een waarschuwing en komt achteraan in de keuzelijst.
 - **Lokalen zijn geen beperking, wel een signaal**: lokalen kun je bijvragen. Ze tellen niet mee in krapte, prioriteit en afhankelijkheden, en ook bij het inplannen houden ze niets tegen. Bij het inpassen zoekt de tool eerst een vrij lokaal; is er geen, dan komt het assessment in een *extra lokaal* (een lokaalnummer boven het aantal lokalen) en krijg je de melding dat je in dat dagdeel een lokaal extra nodig hebt. Verhoog na het aanvragen het aantal lokalen op het tabblad Lokalen; de melding verdwijnt dan.
 - **Filter bij Beschikbaarheid**: filter docenten of klassen op naam, of op wat eraan gekoppeld is (klas, docent, module, ID). Meerdere tegelijk met komma's, bijv. `Visser, Bakker`, of `D2A` voor alle docenten van die klas. De onderste rij *Samen vrij* telt per dagdeel hoeveel van de zichtbare regels vrij zijn; groen ✓ = allemaal.
-- **Overzicht bij inplannen**: per lesuur een rij per docent, de klas en elk lokaal op de locatie. Wit = beschikbaar, grijs = niet beschikbaar, geel = al gepland (binnen het dagdeel vooraan getekend, de exacte lesuren liggen niet vast). De rij *Samen vrij* toont per dagdeel hoeveel uur docent(en) en klas samen vrij zijn (groen; oranje = alleen met locatiewissel). Klik daar om de optie in dat dagdeel te kiezen; de gekozen optie is blauw.
+- **Al gepland**: het laatst ingeplande assessment staat bovenaan (# = volgorde van inplannen), zodat je een verkeerde keuze snel terugzet. Het tabblad Planning in Excel staat in de volgorde van inplannen; bij openen blijft die volgorde bewaard.
+- **Overzicht bij inplannen**: per lesuur een rij per docent, de klas en elk lokaal op de locatie. Wit = beschikbaar, grijs = niet beschikbaar, geel = al gepland (binnen het dagdeel vooraan getekend, de exacte lesuren liggen niet vast). De rij *Samen vrij* toont per dagdeel hoeveel uur docent(en) en klas samen vrij zijn (groen; oranje = alleen met locatiewissel). Een rode balk onder de vrije lesuren van een docent betekent: die docent is die dag al op een andere locatie ingepland. Klik daar om de optie in dat dagdeel te kiezen; de gekozen optie is blauw.
 - **Past een assessment niet**, dan heet de knop *Bekijken*. Je ziet hetzelfde rooster; in de rij *Samen vrij* staat per dagdeel wie het tegenhoudt (niet beschikbaar, of vol door een gepland assessment), en bovenaan de dagdelen waar één aanpassing genoeg is.
 - **Krapte** per assessment: benodigde uren gedeeld door de uren waarin de klas en alle docenten tegelijk vrij zijn.
 - **Bezetting** per docent en klas: uren die nog nodig zijn gedeeld door de uren die nog vrij zijn. Per locatie staat ter informatie ook de bezetting in lokaaluren (lokalen × lesuren).
@@ -106,3 +107,7 @@ Pak de map uit en dubbelklik op `index.html`. De tool werkt in een recente versi
 | `js/controle.js` | Definitie van de controlevoorbeelden |
 | `js/voorbeeld.js` | Fictief voorbeeld (knop Voorbeeld) |
 | `voorbeelden/` | Leeg sjabloon, ingevuld voorbeeldsjabloon en voorbeeldwerkbestand |
+
+## Versie
+
+Deze versie is **0.8**. Het nummer staat in de kop van de planner, op het tabblad Instellingen van een werkbestand en achter de verwijzingen naar de scripts en de stijl (`?v=0.8`), zodat de browser na een update geen oude bestanden gebruikt.
