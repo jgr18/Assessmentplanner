@@ -89,7 +89,7 @@
     regel('Klassen', 'Per klas/groep per dagdeel: + = beschikbaar, leeg = niet beschikbaar. Een klas die hier niet staat, of met een helemaal lege regel, is overal beschikbaar. De locatie volgt uit de eerste letter van de klas: A = Apeldoorn, D = Deventer, E = Enschede.' + (werkbestand ? ' De kolom Locatie toont de locatie ter controle; een ingevulde locatie gaat voor de eerste letter.' : ''));
     regel('Instellingen', 'Naam van de planning en de drempel voor een sterke koppeling (standaard 20%).');
     if (werkbestand) {
-      regel('Planning', 'Wat al is ingepast: per assessment het dagdeel, het aantal uren en het lokaalnummer. Een assessment dat doorloopt over ochtend en middag staat op twee regels.');
+      regel('Planning', 'Wat al is ingepast: per assessment het dagdeel, het aantal uren en het lokaalnummer. Een assessment dat doorloopt over meerdere dagdelen staat op één regel: dagdeel "wo-o + wo-m", uren "12 (6 + 6)", lokaal "1" (of per dagdeel "1 + 2"). Module, klas en docent(en) zijn ter informatie.');
       regel('Interventies', 'Logboek van wat je hebt aangepast om knelpunten op te lossen: datum (dd-mm-jjjj), betreft (assessment-ID, "docent: naam" of "klas: naam", gescheiden door ;), wat is aangepast, reden, met wie overlegd en status (Akkoord, In afwachting, Niet akkoord, Vervallen). Wordt bij openen ingelezen.');
       regel('Uitvoer', 'De groene en oranje tabbladen (behalve Planning) zijn uitvoer van de analyse. Bij het openen in de app worden ze genegeerd en opnieuw berekend. Bezetting staat er twee keer in: bij invoer (alsof er niets gepland is) en na planning.');
     }
@@ -115,11 +115,21 @@
 
   function werkbestandBladen(m, r) {
     const tvLabel = id => (m.tijdvakken.find(t => t.id === id) || { label: id }).label;
-    const p = [['ID', 'Module', 'Klas/groep', 'Dagdeel', 'Uren', 'Lokaal'].map(v => ({ v, stijl: KOP }))];
-    m.assessments.filter(a => a.gepland.length).sort((x, y) => (x.planVolgorde || 0) - (y.planVolgorde || 0)).forEach(a => a.gepland.forEach(s => p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: tvLabel(s.tv), stijl: { rand: true } }, { v: s.uren, stijl: { rand: true } }, { v: s.lokaal, stijl: Object.assign({ rand: true }, a.klas && AP.model.lokalenIn(m, (m.klassen.find(k => k.naam === a.klas) || {}).locatie || '', s.tv) < s.lokaal ? { vulling: 'F7C1C1', vet: true } : {}) }])));
+    const p = [['ID', 'Module', 'Klas/groep', 'Docent(en)', 'Dagdeel', 'Uren', 'Lokaal'].map(v => ({ v, stijl: KOP }))];
+    /* één regel per assessment; loopt het over meerdere dagdelen, dan "wo-o + wo-m", uren "12 (6 + 6)" en lokaal "1" of "1 + 2" */
+    const nl = x => String(x).replace('.', ',');
+    m.assessments.filter(a => a.gepland.length).sort((x, y) => (x.planVolgorde || 0) - (y.planVolgorde || 0)).forEach(a => {
+      const g = a.gepland, meer = g.length > 1, loc = (m.klassen.find(k => k.naam === a.klas) || {}).locatie || '';
+      const extra = g.some(s => AP.model.lokalenIn(m, loc, s.tv) < s.lokaal), lokalen = g.map(s => s.lokaal);
+      const som = g.reduce((t, s) => t + s.uren, 0);
+      p.push([{ v: a.id, stijl: { rand: true, vet: true } }, { v: a.module, stijl: Object.assign({ rand: true }, INFO) }, { v: a.klas, stijl: Object.assign({ rand: true }, INFO) }, { v: a.docenten.join('; '), stijl: Object.assign({ rand: true }, INFO) },
+        { v: g.map(s => tvLabel(s.tv)).join(' + '), stijl: { rand: true } },
+        { v: meer ? nl(som) + ' (' + g.map(s => nl(s.uren)).join(' + ') + ')' : g[0].uren, stijl: Object.assign({ rand: true }, meer ? { getal: 49 } : {}) },
+        { v: lokalen.every(l => l === lokalen[0]) ? lokalen[0] : lokalen.join(' + '), stijl: Object.assign({ rand: true }, extra ? { vulling: 'F7C1C1', vet: true } : {}) }]);
+    });
     return kleurEnOrden([toelichtingBlad(true), instellingenBlad(m, true)]
       .concat(invoerBladen(m, { metIds: true, extraRijen: 20 }))
-      .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 10, 8, 8], bevries: { y: 1 } }, interventieBlad(m)])
+      .concat([{ naam: 'Planning', rijen: p, kolommen: [9, 28, 14, 26, 16, 12, 9], bevries: { y: 1 } }, interventieBlad(m)])
       .concat(AP.export.bladen(m, r)));
   }
   /* Interventies: datum als tekst dd-mm-jjjj, status met keuzelijst. Nieuwste bovenaan. */

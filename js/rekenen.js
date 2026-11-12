@@ -77,9 +77,44 @@
       a.docenten.forEach(d => { const s = docentDagLoc[d] && docentDagLoc[d][dg]; if (s) s.forEach(l => { if (l !== loc) anders.push(d + ' (' + l + ')'); }); });
       return anders;
     }
+    /* Regel voor docenten én klassen: tussen twee assessments op één dag zit minstens 1 lesuur pauze.
+       Per dag: uren van alle assessments + (aantal − 1) pauzes ≤ lesuren van die dag (bijv. 12 op ma–do, 11 op vr).
+       Per dagdeel: zit er al een assessment, dan blijft er ook daar 1 lesuur pauze over. Eén assessment dat de hele dag duurt mag wel. */
+    const dagTotaal = {}; TV.forEach(t => { dagTotaal[dag[t.id]] = (dagTotaal[dag[t.id]] || 0) + t.uren; });
+    const resDag = { docent: {}, klas: {} }, resTv = { docent: {}, klas: {} };
+    const noteer = (soort, naam, g, s) => {
+      const d = ((resDag[soort][naam] = resDag[soort][naam] || {})[dag[s.tv]] = resDag[soort][naam][dag[s.tv]] || { uren: 0, ids: new Set() }); d.uren += s.uren; d.ids.add(g.id);
+      const t = ((resTv[soort][naam] = resTv[soort][naam] || {})[s.tv] = resTv[soort][naam][s.tv] || { uren: 0, ids: new Set() }); t.uren += s.uren; t.ids.add(g.id);
+    };
+    geplandeAss.forEach(g => g.gepland.forEach(s => { if (U[s.tv] === undefined) return; g.docenten.forEach(d => noteer('docent', d, g, s)); noteer('klas', g.klas, g, s); }));
+    /* vrije uren met pauze: zit er in het dagdeel al iets, dan gaat er 1 lesuur pauze af */
+    const pauzeAf = (soort, naam, tv) => ((resTv[soort][naam] || {})[tv] ? 1 : 0);
+    function mensenCapPauze(a, tv) {
+      let c = Math.max(0, persRest('klas', a.klas, tv) - pauzeAf('klas', a.klas, tv));
+      a.docenten.forEach(d => { c = Math.min(c, Math.max(0, persRest('docent', d, tv) - pauzeAf('docent', d, tv))); });
+      return c;
+    }
+    const pauzeRegel = (a, segs) => {
+      const perDag = {}; segs.forEach(s => { perDag[dag[s.tv]] = (perDag[dag[s.tv]] || 0) + s.uren; });
+      const uit = [], wie = a.docenten.map(d => ['docent', d]).concat([['klas', a.klas]]);
+      wie.forEach(([soort, naam]) => {
+        const label = (soort === 'klas' ? 'klas ' : '') + naam;
+        Object.keys(perDag).forEach(dg => {
+          const x = (resDag[soort][naam] || {})[dg]; if (!x || !x.ids.size) return;
+          const n = x.ids.size, nodig = x.uren + perDag[dg] + n;
+          if (nodig > dagTotaal[dg] + 1e-9) uit.push({ naam, soort, tekst: label + ' op ' + dg + ': ' + [...x.ids].join(' + ') + ' + ' + a.id + ' = ' + fmt(x.uren + perDag[dg]) + ' uur + ' + n + (n > 1 ? ' pauzes' : ' pauze') + ' = ' + fmt(nodig) + ', meer dan ' + fmt(dagTotaal[dg]) + ' lesuren' });
+        });
+        segs.forEach(s => {
+          const x = (resTv[soort][naam] || {})[s.tv]; if (!x || !x.ids.size) return;
+          const nodig = x.uren + s.uren + x.ids.size;
+          if (nodig > U[s.tv] + 1e-9) uit.push({ naam, soort, tekst: label + ' in ' + TV[idx[s.tv]].label + ': na ' + [...x.ids].join(' + ') + ' geen lesuur pauze over voor ' + a.id });
+        });
+      });
+      return uit;
+    };
     function opties(a) {
       const loc = locVan(a.klas), uit = []; if (!loc) return uit;
-      const cap = tv => mensenCap(a, tv); /* lokalen zijn geen grens: zonder vrij lokaal volgt de melding 'extra lokaal nodig' */
+      const cap = tv => mensenCapPauze(a, tv); /* met 1 lesuur pauze na/voor een ander assessment; lokalen zijn geen grens: zonder vrij lokaal volgt de melding 'extra lokaal nodig' */
       /* liever geen twee assessments van dezelfde klas op één dag */
       const klasDag = {}; geplandeAss.forEach(g => { if (g.klas === a.klas) g.gepland.forEach(s => { if (U[s.tv] !== undefined) (klasDag[dag[s.tv]] = klasDag[dag[s.tv]] || new Set()).add(g.id); }); });
       const zelfdeDag = tv => klasDag[dag[tv]] ? a.klas + ' heeft op ' + dag[tv] + ' al ' + [...klasDag[dag[tv]]].join(', ') : '';
@@ -115,6 +150,9 @@
           if (midden >= a.uren) break;
         }
       });
+      const afgewezen = [];
+      for (let i = uit.length - 1; i >= 0; i--) { const v = pauzeRegel(a, uit[i].segmenten); if (v.length) { afgewezen.push.apply(afgewezen, v.map(x => x.tekst)); uit.splice(i, 1); } }
+      uit.afgewezen = [...new Set(afgewezen)];
       uit.sort((p, q) => (!!p.waarschuwing - !!q.waarschuwing) || (!!p.zelfdeDag - !!q.zelfdeDag) || (!!p.extraLokaal - !!q.extraLokaal) || (p.span - q.span) || (p.restNa - q.restNa) || (p.start - q.start));
       return uit;
     }
@@ -163,7 +201,9 @@
       let prio = krapte, knelpunt = 'gezamenlijke beschikbaarheid';
       res.forEach(r => { if (r.graad > prio) { prio = r.graad; knelpunt = (r.soort === 'docent' ? 'docent ' : r.soort === 'klas' ? 'klas ' : 'lokalen ') + r.naam; } });
       const bron = 'Assessment ' + a.id + ' (' + a.module + ', ' + a.klas + ')';
-      if (!opt.length && loc) {
+      if (!opt.length && loc && opt.afgewezen && opt.afgewezen.length) {
+        fouten.push({ bron, melding: 'Docent(en) en klas zijn wel samen vrij, maar dan zit er geen lesuur pauze tussen de assessments. ' + opt.afgewezen.slice(0, 2).join('; ') + '.', herstel: 'Plan een ander assessment van die docent of klas op een andere dag, of breid de beschikbaarheid uit.' });
+      } else if (!opt.length && loc) {
         {
           fouten.push({ bron, melding: (a.docenten.length > 1 ? 'Klas en docenten zijn' : 'Klas en docent zijn') + ' samen maar ' + fmt(overlapMensen) + ' uur tegelijk vrij' + (geplandeAss.length ? ' (na de al geplande assessments)' : '') + '; nodig is ' + fmt(a.uren) + ' uur, in één dagdeel of doorlopend op één dag.', herstel: 'Breid de beschikbaarheid van ' + [a.klas].concat(a.docenten).join(', ') + ' uit, of verdeel het assessment.' });
         }
@@ -171,8 +211,9 @@
         waarschuwingen.push({ bron, melding: 'Past alleen als een docent die dag op twee locaties is.', herstel: 'Plan bij voorkeur eerst anders, of accepteer de locatiewissel bij het inplannen.' });
       }
       const klasDagTv = {}; TV.forEach(t => { if (geplandeAss.some(g => g.klas === a.klas && g.gepland.some(s => U[s.tv] !== undefined && dag[s.tv] === dag[t.id]))) klasDagTv[t.id] = true; });
-      const capPerTv = {}; TV.forEach(t => { capPerTv[t.id] = locatieWissel(a, dag[t.id]).length ? -mensenCap(a, t.id) : mensenCap(a, t.id); });
-      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, alleenMetExtraLokaal: opt.length > 0 && opt.every(o => o.extraLokaal), opties: opt, res, capPerTv, klasDagTv };
+      const volleDagTv = {}; TV.forEach(t => { const v = pauzeRegel(a, [{ tv: t.id, uren: Math.min(a.uren, t.uren) }]); if (v.length) volleDagTv[t.id] = v; });
+      const capPerTv = {}; TV.forEach(t => { capPerTv[t.id] = locatieWissel(a, dag[t.id]).length ? -mensenCapPauze(a, t.id) : mensenCapPauze(a, t.id); });
+      return { id: a.id, module: a.module, klas: a.klas, locatie: loc, docenten: a.docenten.slice(), uren: a.uren, overlap: overlapMensen, overlapMetLokaal: overlapRegel, krapte, prio, knelpunt, past: opt.length > 0, alleenMetWissel: opt.length > 0 && !zonderWissel.length, alleenMetExtraLokaal: opt.length > 0 && opt.every(o => o.extraLokaal), opties: opt, res, capPerTv, klasDagTv, volleDagTv };
     });
 
     /* --- koppelingen --- */

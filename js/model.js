@@ -3,7 +3,7 @@
   'use strict';
   const AP = root.AP = root.AP || {};
   const OPSLAGSLEUTEL = 'assessmentplanner:model';
-  AP.versie = '1.0'; /* versie van de tool; ook in index.html en controle.html (?v=…) */
+  AP.versie = '1.2'; /* versie van de tool; ook in index.html en controle.html (?v=…) */
 
   function standaardTijdvakken() {
     const dagen = ['ma', 'di', 'wo', 'do', 'vr'], delen = [['o', 'ochtend'], ['m', 'middag']];

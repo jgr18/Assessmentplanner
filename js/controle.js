@@ -68,6 +68,20 @@
       if (!it.past || !o.extraLokaal || o.segmenten[0].lokaal !== 2) return { ok: false, detail: 'optie: ' + JSON.stringify(o) };
       M.plan(m, 'S002', o.segmenten); const r2 = R.analyseer(m);
       return { ok: r2.lokaalTekort.length === 1 && r2.lokaaldruk.find(x => x.locatie === 'Deventer').extra >= 1 && r2.waarschuwingen.some(w => /extra nodig/.test(w.melding)), detail: r2.waarschuwingen.map(w => w.melding).join(' ') }; } },
+    { naam: 'Docent: minstens 1 lesuur pauze tussen assessments op een dag', uitleg: 'Dag van 12 lesuren (2 × 6). Docent P heeft al 6 uur (S001) op maandagochtend. Een tweede van 6 uur op maandag past niet (6 + 6 + 1 pauze = 13); een van 5 uur wel (5 + 6 + 1 = 12). Eén assessment van 12 uur op een dag mag wel.', test() {
+      const m = bouw([['A', '1A', 'P', '6'], ['B', '1B', 'P', '6'], ['C', '1C', 'P', '5'], ['D', '1D', 'Q', '12']], { P: '*', Q: '*' }, { '1A': '*', '1B': '*', '1C': '*', '1D': '*' }, ['ma-o', 'ma-m', 'di-o', 'di-m']);
+      m.tijdvakken.forEach(t => { t.uren = 6; });
+      M.plan(m, 'S001', [{ tv: 'T0', uren: 6, lokaal: 1 }]);
+      const r = R.analyseer(m), b = r.volgorde.find(x => x.id === 'S002'), c = r.volgorde.find(x => x.id === 'S003'), d = r.volgorde.find(x => x.id === 'S004');
+      const opMa = it => it.opties.some(o => o.segmenten.some(s => s.tv === 'T0' || s.tv === 'T1'));
+      return { ok: !opMa(b) && b.opties.length > 0 && opMa(c) && d.opties.some(o => o.segmenten.length === 2), detail: 'S002: ' + b.opties.map(o => o.segmenten.map(s => s.tv).join('+')).join(', ') + ' · S003: ' + c.opties.map(o => o.segmenten.map(s => s.tv).join('+')).join(', ') }; } },
+    { naam: 'Klas: ook pauze, en drie assessments geven twee pauzes', uitleg: 'Klas 1A heeft op maandag al 4 uur (ma-o) en 3 uur (ma-m). Een derde van 4 uur geeft 4 + 3 + 4 = 11 uur + 2 pauzes = 13, meer dan 12: niet op maandag. Een derde van 1 uur past wel (ma-m: 3 + 1 + 1 pauze = 5).', test() {
+      const m = bouw([['A', '1A', 'P', '4'], ['B', '1A', 'Q', '3'], ['C', '1A', 'R', '4'], ['E', '1A', 'S', '1']], { P: '*', Q: '*', R: '*', S: '*' }, { '1A': '*' }, ['ma-o', 'ma-m', 'di-o', 'di-m']);
+      m.tijdvakken.forEach(t => { t.uren = 6; });
+      M.plan(m, 'S001', [{ tv: 'T0', uren: 4, lokaal: 1 }]); M.plan(m, 'S002', [{ tv: 'T1', uren: 3, lokaal: 1 }]);
+      const r = R.analyseer(m), c = r.volgorde.find(x => x.id === 'S003'), e = r.volgorde.find(x => x.id === 'S004');
+      const opMa = it => it.opties.some(o => o.segmenten.some(s => s.tv === 'T0' || s.tv === 'T1'));
+      return { ok: !opMa(c) && c.opties.length > 0 && opMa(e), detail: 'S003: ' + c.opties.map(o => o.segmenten.map(s => s.tv).join('+')).join(', ') + ' · S004: ' + e.opties.map(o => o.segmenten.map(s => s.tv).join('+')).join(', ') }; } },
     { naam: 'Liever niet twee assessments van een klas op één dag', uitleg: 'Klas 1A heeft al een assessment op maandagochtend. Bij het tweede assessment van 1A staan de opties op dinsdag bovenaan; maandag kan nog wel, maar lager en gemarkeerd.', test() {
       const m = bouw([['A', '1A', 'P', '2'], ['B', '1A', 'Q', '2']], { P: '*', Q: '*' }, { '1A': '*' }, ['ma-o', 'ma-m', 'di-o']);
       m.klassen.forEach(k => { k.locatie = 'Deventer'; });
@@ -79,11 +93,11 @@
       m.tijdvakken.forEach(t => { t.uren = 6; });
       const r = R.analyseer(m), o = r.volgorde[0].opties[0];
       return { ok: !!o && o.segmenten.length === 2 && o.segmenten.every(s => s.uren === 6) && R.dagVan(m.tijdvakken.find(t => t.id === o.segmenten[0].tv)) === R.dagVan(m.tijdvakken.find(t => t.id === o.segmenten[1].tv)), detail: o ? o.segmenten.map(s => s.tv + ':' + s.uren + 'u').join(' + ') : 'geen optie' }; } },
-    { naam: 'Gedeeltelijk ochtend en middag', uitleg: 'Een assessment van 3 uur kan 2 uur aan het eind van de ochtend en 1 uur aan het begin van de middag beslaan als er maar 2 uur vrij is in de ochtend.', test() {
+    { naam: 'Gedeeltelijk ochtend en middag', uitleg: 'Na 4 uur in de ochtend (zelfde docent en klas) blijft er met 1 lesuur pauze nog 1 uur over: een assessment van 3 uur beslaat dan 1 uur aan het eind van de ochtend en 2 uur aan het begin van de middag.', test() {
       const m = bouw([['Vol', '1A', 'P', '4'], ['Drie', '1A', 'P', '3']], { P: [0, 1] }, { '1A': [0, 1] }, ['ma-o', 'ma-m']);
       m.tijdvakken.forEach(t => { t.uren = 6; }); M.plan(m, 'S001', [{ tv: 'T0', uren: 4, lokaal: 1 }]); M.plan(m, 'S001', [{ tv: 'T0', uren: 4, lokaal: 1 }]);
       const r = R.analyseer(m), span = r.volgorde[0].opties.find(o => o.span);
-      return { ok: !!span && span.segmenten[0].uren === 2 && span.segmenten[1].uren === 1, detail: span ? span.segmenten.map(s => s.tv + ':' + s.uren + 'u').join(' + ') : 'geen doorlopende optie' }; } },
+      return { ok: !!span && span.segmenten[0].uren === 1 && span.segmenten[1].uren === 2, detail: span ? span.segmenten.map(s => s.tv + ':' + s.uren + 'u').join(' + ') : 'geen doorlopende optie' }; } },
     { naam: 'Waarschuwing bij twee locaties op één dag', uitleg: 'Als een docent die dag al op een andere locatie is, krijgt de plaatsing een waarschuwing en komt ze achteraan.', test() {
       const m = bouw([['A', '1A', 'P', '2'], ['B', '2A', 'P', '2']], { P: [0] }, { '1A': [0], '2A': [0, 1] }, ['ma-o', 'ma-m']);
       m.tijdvakken.forEach(t => { t.uren = 6; }); M.vindRes(m, 'klas', '2A').locatie = 'Deventer'; M.vindRes(m, 'docent', 'P').beschikbaar = ['T0', 'T1'];

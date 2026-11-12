@@ -155,14 +155,29 @@
           if (i === 0 || !tekst(r[pId])) return;
           const bron = 'Tabblad Planning, rij ' + (i + 1), id = tekst(r[pId]).toUpperCase(), a = m.assessments.find(x => x.id === id);
           if (!a) return fout(bron, 'Assessment ' + id + ' staat niet op het tabblad Assessments.', 'Verwijder deze regel of voeg het assessment toe.');
-          const tv = tvOpLabel(r[pDag]); if (!tv) return fout(bron, 'Onbekend dagdeel "' + tekst(r[pDag]) + '".', 'Gebruik een dagdeel uit de kopregel van het tabblad Locaties.');
-          const uren = getal(r[pUren]), lokaal = getal(r[pLok]);
-          if (!(uren > 0)) return fout(bron, 'Uren "' + tekst(r[pUren]) + '" is geen positief getal.', 'Vul het aantal uren in.');
-          const klas = m.klassen.find(k => k.naam === a.klas), max = klas && klas.locatie ? AP.model.lokalenIn(m, klas.locatie, tv) : 0;
+          /* Dagdeel kan "wo-o + wo-m" zijn (doorlopend); uren dan "12 (6 + 6)" of "6 + 6"; lokaal "1" of "1 + 2". */
+          const delen = tekst(r[pDag]).split(/\s*\+\s*/).filter(Boolean);
+          const tvs = delen.map(x => tvOpLabel(x)), onbekend = delen.filter((x, j) => !tvs[j]);
+          if (!delen.length || onbekend.length) return fout(bron, 'Onbekend dagdeel "' + (onbekend[0] || tekst(r[pDag])) + '".', 'Gebruik dagdelen uit de kopregel van het tabblad Locaties; meerdere met +, bijv. wo-o + wo-m.');
+          const lijst = t => t.split(/\s*\+\s*/).map(x => getal(x));
+          let ut = tekst(r[pUren]); const haak = ut.match(/\(([^)]*)\)/);
+          let uren = typeof r[pUren] === 'number' ? [r[pUren]] : lijst(haak ? haak[1] : ut);
+          if (tvs.length > 1 && uren.length === 1 && uren[0] > 0) {
+            /* alleen een totaal: verdelen over de dagdelen, de eerste zo vol mogelijk */
+            let rest = uren[0]; uren = tvs.map((t, j) => { const tvd = m.tijdvakken.find(x => x.id === t), u = j === tvs.length - 1 ? rest : Math.min(rest, tvd.uren); rest -= u; return u; });
+            let_op(bron, 'Bij ' + id + ' staat alleen het totaal aan uren; verdeeld als ' + uren.join(' + ') + '.', 'Schrijf de uren per dagdeel, bijv. "12 (6 + 6)", als je een andere verdeling wilt.');
+          }
+          if (uren.length !== tvs.length || uren.some(u => !(u > 0))) return fout(bron, 'Uren "' + tekst(r[pUren]) + '" passen niet bij ' + (tvs.length > 1 ? tvs.length + ' dagdelen' : 'het dagdeel') + '.', tvs.length > 1 ? 'Schrijf de uren per dagdeel, bijv. "12 (6 + 6)".' : 'Vul het aantal uren in.');
+          const lt = typeof r[pLok] === 'number' ? [r[pLok]] : lijst(tekst(r[pLok]));
+          const lokalen = lt.length === 1 ? tvs.map(() => lt[0]) : lt;
+          if (lokalen.length !== tvs.length || lokalen.some(l => !(l >= 1))) return fout(bron, 'Lokaal "' + tekst(r[pLok]) + '" is geen lokaalnummer (of past niet bij het aantal dagdelen).', 'Vul een lokaalnummer in (1, 2, …), of per dagdeel met +. Een nummer boven het aantal lokalen betekent: extra lokaal nodig.');
+          const klas = m.klassen.find(k => k.naam === a.klas);
           if (!klas || !klas.locatie) return fout(bron, 'Klas ' + a.klas + ' van ' + id + ' heeft geen (geldige) locatie; de planning is niet overgenomen.', 'Kies de locatie van ' + a.klas + ' op het tabblad Klassen.');
-          if (!(lokaal >= 1)) return fout(bron, 'Lokaal "' + tekst(r[pLok]) + '" is geen lokaalnummer.', 'Vul een lokaalnummer in (1, 2, …). Een nummer boven het aantal lokalen betekent: extra lokaal nodig.');
-          if (lokaal > max) let_op(bron, id + ' staat in lokaal ' + Math.round(lokaal) + ', maar ' + klas.locatie + ' heeft op ' + tekst(r[pDag]) + ' ' + max + ' lokalen. Dit telt als extra lokaal nodig.', 'Vraag het lokaal aan en verhoog het aantal lokalen op het tabblad Locaties, of plan ' + id + ' anders.');
-          (segs[id] = segs[id] || []).push({ tv, uren, lokaal: Math.round(lokaal) });
+          tvs.forEach((tv, j) => {
+            const max = AP.model.lokalenIn(m, klas.locatie, tv), lokaal = Math.round(lokalen[j]);
+            if (lokaal > max) let_op(bron, id + ' staat in lokaal ' + lokaal + ', maar ' + klas.locatie + ' heeft op ' + delen[j] + ' ' + max + ' lokalen. Dit telt als extra lokaal nodig.', 'Vraag het lokaal aan en verhoog het aantal lokalen op het tabblad Locaties, of plan ' + id + ' anders.');
+            (segs[id] = segs[id] || []).push({ tv, uren: uren[j], lokaal });
+          });
         });
         Object.keys(segs).forEach(id => {
           const a = m.assessments.find(x => x.id === id), som = segs[id].reduce((s, x) => s + x.uren, 0);
